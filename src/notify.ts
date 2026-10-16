@@ -22,18 +22,18 @@ export const dm = (member: number, text: string) => send(member, text);
  * to everyone except the person who did it. Skips the chat the action came from.
  */
 export async function announce(text: string, opts: { from?: number; sourceChat?: number } = {}) {
-  const g = groupChatId();
-  const targets = g ? [g] : members.all().filter(m => m.id !== opts.from).map(m => m.id);
+  const g = await groupChatId();
+  const targets = g ? [g] : (await members.all()).filter(m => m.id !== opts.from).map(m => m.id);
   for (const chat of targets) if (chat !== opts.sourceChat) await send(chat, text);
 }
 
 const hm = (m: Member, iso: string | null) => (iso ? clock(m.tz, new Date(iso)) : "--:--");
 
-export function cardText(m: Member) {
-  const d = days.get(m.id, dayKey(m.tz));
+export async function cardText(m: Member) {
+  const d = await days.get(m.id, dayKey(m.tz));
   const g = goalsOf(m);
   const counts = COUNT_KEYS.map(k => `${COUNT_LABEL[k]} ${d[k]}/${g[k]}${d[k] >= g[k] && g[k] > 0 ? " ✓" : ""}`).join(" · ");
-  const open = todos.openFor(m.id).filter(t => t.owner === m.id).length;
+  const open = (await todos.openFor(m.id)).filter(t => t.owner === m.id).length;
   const lines = [
     `<b>${esc(m.name)}</b>  IN ${hm(m, d.in_at)} · OUT ${hm(m, d.out_at)}${hitAll(m, d) ? "  ● all goals hit" : ""}`,
     counts,
@@ -45,25 +45,27 @@ export function cardText(m: Member) {
   return lines.join("\n");
 }
 
-export function todayText() {
-  const ms = members.all();
-  return ms.length ? ms.map(cardText).join("\n\n") : "No one on the team yet.";
+export async function todayText() {
+  const ms = await members.all();
+  if (!ms.length) return "No one on the team yet.";
+  return (await Promise.all(ms.map(cardText))).join("\n\n");
 }
 
-export function weekText() {
-  const ms = members.all();
+export async function weekText() {
+  const ms = await members.all();
   if (!ms.length) return "No one on the team yet.";
-  const rows = ms.map(m => {
+  const rows = await Promise.all(ms.map(async m => {
     const keys = lastDays(m.tz, 7);
+    const byDate = new Map((await days.since(m.id, keys[0])).map(d => [d.date, d]));
     let apps = 0, full = 0;
     const marks = keys.map(k => {
-      const d = days.find(m.id, k);
+      const d = byDate.get(k);
       if (d) apps += d.apps;
       if (hitAll(m, d)) { full++; return "●"; }
       return d && (d.in_at || d.apps || d.outreach || d.commits) ? "◐" : "·";
     }).join(" ");
     return `<b>${esc(m.name)}</b>\n<code>${marks}</code>  ${apps} apps · ${full}/7 full days`;
-  });
+  }));
   return `<b>Last 7 days</b> (oldest → today)\n● every goal hit  ◐ worked  · nothing logged\n\n${rows.join("\n\n")}`;
 }
 

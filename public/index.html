@@ -6,122 +6,133 @@
 <title>Abro</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,600..800&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..100,700..900&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700;800&display=swap">
 <style>
-/* Layout: a shift board for a phone. Sticky tab bar; each tab is one job (today's card, todos, leads, week, setup).
-   Colors follow the Telegram theme when opened inside Telegram; the fallbacks are Abro's own palette. */
+/* Layout: neo-brutalist shift board for a phone. Sticky block tabs; each tab is one job (today, todos, leads, week, setup).
+   Thick strokes, small radii, hard offset shadows, solid neon accent blocks. Light = paper, dark = ink with the same neon. */
 :root{
-  --bg:var(--tg-theme-secondary-bg-color,#E9EEEA);
-  --surface:var(--tg-theme-section-bg-color,var(--tg-theme-bg-color,#FBFCFB));
-  --ink:var(--tg-theme-text-color,#18211E);
-  --muted:var(--tg-theme-hint-color,#5A6862);
-  --accent:var(--tg-theme-button-color,#1E58B8);
-  --accent-ink:var(--tg-theme-button-text-color,#FFFFFF);
-  --line:color-mix(in srgb,var(--muted) 30%,transparent);
-  --stamp:#B8430F; --good:#1F7A4D;
-  --display:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --paper:#F5F5DC; --card:#FFFFFF; --ink:#000000; --stroke:#000000; --muted:#55553F; --well:#ECECCF;
+  --teal:#00C2CB; --magenta:#FF00FF; --yellow:#FFD700; --on-accent:#000000;
+  --glow:transparent;
+  --sw:3px; --r:4px; --sh1:3px 3px 0 var(--stroke); --sh2:6px 6px 0 var(--stroke);
+  --display:"Archivo","Arial Narrow",Impact,system-ui,sans-serif;
   --body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
 }
-@media (prefers-color-scheme:dark){:root{
-  --bg:var(--tg-theme-secondary-bg-color,#101614);
-  --surface:var(--tg-theme-section-bg-color,var(--tg-theme-bg-color,#18201D));
-  --ink:var(--tg-theme-text-color,#E4EBE7);
-  --muted:var(--tg-theme-hint-color,#93A39C);
-  --accent:var(--tg-theme-button-color,#7FA9F2);
-  --accent-ink:var(--tg-theme-button-text-color,#0E1A2E);
-  --stamp:#F0905F; --good:#5FCB93; color-scheme:dark}}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0B0B0B; --card:#161616; --ink:#F5F5DC; --stroke:#F5F5DC; --muted:#A9A98F; --well:#222218;
+  --glow:color-mix(in srgb,#00C2CB 45%,transparent); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0B0B0B; --card:#161616; --ink:#F5F5DC; --stroke:#F5F5DC; --muted:#A9A98F; --well:#222218;
+  --glow:color-mix(in srgb,#00C2CB 45%,transparent); color-scheme:dark}
 *{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);-webkit-font-smoothing:antialiased}
-.top{position:sticky;top:0;z-index:5;background:var(--bg);padding:12px max(14px,env(safe-area-inset-left)) 0 max(14px,env(safe-area-inset-right));border-bottom:1px solid var(--line)}
-.brand{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
-.brand h1{margin:0;font:800 30px/1 var(--display);font-stretch:75%}
-.brand span{font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-nav{display:flex;gap:2px;overflow-x:auto;margin-top:10px;scrollbar-width:none}
-nav button{flex:1;border:0;background:none;color:var(--muted);font:600 14px var(--body);padding:8px 10px 10px;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap}
-nav button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
-nav .badge{font:700 11px var(--mono);color:var(--accent);margin-left:4px}
-main{padding:14px max(14px,env(safe-area-inset-left)) 40px max(14px,env(safe-area-inset-right));display:grid;gap:14px;max-width:720px;margin:0 auto}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:12px;min-width:0}
-.card.me{border-color:var(--accent)}
-.who{display:flex;align-items:center;gap:8px}
-.who b{font:700 18px var(--display);font-stretch:90%}
-.who .tag{margin-left:auto;font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-.punch{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font:500 12px var(--mono);color:var(--muted)}
-.punch span{border:1px solid var(--line);padding:3px 8px;border-radius:4px}
-.punch span.on{color:var(--stamp);border-color:var(--stamp)}
-.counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.count{border:1px solid var(--line);border-radius:8px;padding:8px;display:grid;gap:4px;min-width:0}
-.count label{font:500 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
-.count .n{font:700 24px var(--mono);font-variant-numeric:tabular-nums}
-.count .n small{font-size:13px;color:var(--muted);font-weight:500}
-.count.hit{border-color:var(--good)} .count.hit .n{color:var(--good)}
+body{background:var(--paper);color:var(--ink);font:15px/1.5 var(--body);-webkit-font-smoothing:antialiased}
+.top{position:sticky;top:0;z-index:5;background:var(--paper);padding:12px max(14px,env(safe-area-inset-right)) 10px max(14px,env(safe-area-inset-left));border-bottom:var(--sw) solid var(--stroke)}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:8px;max-width:720px;margin:0 auto}
+.brand h1{margin:0;font:900 36px/.9 var(--display);font-stretch:62%;text-transform:uppercase;letter-spacing:.01em;display:flex;align-items:center;gap:8px}
+.brand h1 i{font:800 15px/1 var(--body);font-style:normal;background:var(--yellow);color:var(--on-accent);padding:4px 6px;border:2px solid #000;border-radius:3px;box-shadow:2px 2px 0 var(--stroke)}
+.brand span{font:800 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;background:var(--ink);color:var(--paper);padding:4px 8px;border-radius:3px}
+nav{display:flex;gap:6px;overflow-x:auto;margin:12px auto 0;max-width:720px;scrollbar-width:none;padding:0 4px 4px 0}
+nav button{flex:1;min-height:40px;box-shadow:none;border:2px solid var(--stroke);border-radius:3px;background:var(--card);color:var(--ink);font:800 13px var(--display);font-stretch:75%;letter-spacing:.04em;text-transform:uppercase;padding:6px 8px;cursor:pointer;white-space:nowrap}
+nav button[aria-selected="true"]{background:var(--teal);color:var(--on-accent);border-color:#000;box-shadow:3px 3px 0 var(--stroke),0 0 14px var(--glow)}
+nav .badge:empty{display:none}
+nav .badge{font:800 10px var(--mono);background:var(--yellow);color:var(--on-accent);border:2px solid #000;border-radius:3px;padding:0 4px;margin-left:5px}
+main{padding:18px max(14px,env(safe-area-inset-right)) 48px max(14px,env(safe-area-inset-left));display:grid;gap:20px;max-width:720px;margin:0 auto}
+.card{background:var(--card);border:var(--sw) solid var(--stroke);border-radius:var(--r);box-shadow:var(--sh2);padding:14px;display:grid;gap:12px;min-width:0;margin-right:6px}
+.card.me{box-shadow:var(--sh2),0 0 22px var(--glow)}
+.who{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.who b{font:900 24px/1 var(--display);font-stretch:68%;text-transform:uppercase}
+.who .tag{margin-left:auto;font:800 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;border:2px solid var(--stroke);border-radius:3px;padding:2px 6px}
+.card.me .who .tag{background:var(--teal);color:var(--on-accent);border-color:#000}
+.punch{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font:800 12px var(--mono)}
+.punch span{border:2px solid var(--stroke);border-radius:3px;padding:4px 8px;background:var(--well)}
+.punch span.on{background:var(--ink);color:var(--paper)}
+.counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.count{border:var(--sw) solid var(--stroke);border-radius:var(--r);padding:8px;display:grid;gap:4px;min-width:0;background:var(--card)}
+.count label{font:800 10px var(--mono);letter-spacing:.04em;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.count .n{font:800 28px/1.1 var(--mono);font-variant-numeric:tabular-nums}
+.count .n small{font-size:13px;color:var(--muted);font-weight:700}
+.count.hit{background:var(--teal);color:var(--on-accent);border-color:#000;box-shadow:0 0 16px var(--glow)}
+.count.hit .n small{color:var(--on-accent)}
+.count.hit .step button{border-color:#000;box-shadow:2px 2px 0 #000}
 .step{display:flex;gap:6px}
-button{font:600 14px var(--body);border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 12px;cursor:pointer}
-button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-button.stampbtn{border-color:var(--stamp);color:var(--stamp);font:700 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:5px 10px}
-.step button{flex:1;padding:6px 0;font:700 17px var(--mono)}
-.field{display:grid;gap:4px;min-width:0}
-.field>span{font:500 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-textarea,input,select{font:15px/1.45 var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-width:0}
-textarea{resize:vertical;min-height:56px}
-.ro p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+button{font:800 14px var(--body);border-radius:var(--r);border:var(--sw) solid var(--stroke);background:var(--card);color:var(--ink);padding:9px 14px;min-height:44px;cursor:pointer;box-shadow:var(--sh1);transition:transform .06s,box-shadow .06s}
+button:active{transform:translate(3px,3px);box-shadow:none}
+button:disabled{opacity:.45;box-shadow:none;cursor:default}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--magenta);outline-offset:3px}
+button.primary{background:var(--teal);color:var(--on-accent);border-color:#000;text-transform:uppercase;font:800 15px var(--display);font-stretch:80%;letter-spacing:.04em}
+button.in{background:var(--yellow);color:var(--on-accent);border-color:#000}
+button.out{background:var(--magenta);color:var(--on-accent);border-color:#000}
+button.stampbtn{font:800 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;min-height:36px;padding:5px 12px}
+.step button{flex:1;min-height:40px;padding:0;font:800 20px var(--mono);box-shadow:2px 2px 0 var(--stroke)}
+.field{display:grid;gap:5px;min-width:0}
+.field>span{font:800 10px var(--mono);letter-spacing:.06em;text-transform:uppercase}
+textarea,input,select{font:15px/1.45 var(--body);color:var(--ink);background:var(--card);border:var(--sw) solid var(--stroke);border-radius:var(--r);padding:9px 10px;width:100%;min-width:0;min-height:44px}
+textarea{resize:vertical;min-height:60px}
+input[type=checkbox]{width:22px;height:22px;min-height:0;accent-color:var(--teal)}
+::placeholder{color:var(--muted);opacity:1}
+.ro p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;border-left:var(--sw) solid var(--stroke);padding-left:10px}
 .empty{color:var(--muted);font-style:italic}
-h2{margin:0;font:700 20px/1.2 var(--display);font-stretch:85%}
+h2{margin:0;font:900 26px/1 var(--display);font-stretch:66%;text-transform:uppercase}
 .hint{color:var(--muted);font-size:13px;margin:0}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .grow{flex:1;min-width:0}
-.todo{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}
+.todo{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:2px solid var(--stroke)}
 .todo:last-child{border-bottom:0}
-.todo .box{flex:none;width:22px;height:22px;border-radius:6px;border:1.5px solid var(--muted);display:grid;place-items:center;padding:0;background:none;font:700 13px var(--mono);color:var(--surface)}
-.todo.done .box{background:var(--good);border-color:var(--good)}
+.todo .box{flex:none;width:28px;height:28px;min-height:0;border-radius:3px;display:grid;place-items:center;padding:0;font:800 16px var(--mono);box-shadow:2px 2px 0 var(--stroke)}
+.todo.done .box{background:var(--teal);color:var(--on-accent);border-color:#000}
 .todo.done .txt{text-decoration:line-through;color:var(--muted)}
-.todo .txt{flex:1;min-width:0;overflow-wrap:anywhere}
-.todo .meta{font:500 11px var(--mono);color:var(--muted)}
-.todo .x{border:0;background:none;color:var(--muted);padding:0 4px;font-size:18px;line-height:1}
-.todo.ro .box{border-style:dashed;cursor:default}
-.lead{border-left:4px solid var(--accent)}
-.lead.done{border-left-color:var(--good)} .lead.skip{opacity:.7;border-left-color:var(--line)}
-.lead h3{margin:0;font:700 17px/1.3 var(--display);font-stretch:90%;overflow-wrap:anywhere}
-.lead h3 a{color:inherit}
-.lead .meta{font:500 12px var(--mono);color:var(--muted)}
+.todo .txt{flex:1;min-width:0;overflow-wrap:anywhere;font-weight:600}
+.todo .meta{font:700 11px var(--mono);color:var(--muted)}
+.todo .x{border:0;background:none;box-shadow:none;min-height:0;padding:0 4px;font-size:22px;line-height:1}
+.todo.ro .box{border-style:dashed;box-shadow:none;cursor:default}
+.lead h3{margin:0;font:900 22px/1.05 var(--display);font-stretch:70%;text-transform:uppercase;overflow-wrap:anywhere}
+.lead h3 a{color:inherit;text-decoration-thickness:3px;text-decoration-color:var(--teal);text-underline-offset:3px}
 .lead p{margin:0;overflow-wrap:anywhere}
-.lead .row button{font-size:13px;padding:6px 10px}
-.sel{background:var(--ink)!important;color:var(--surface)!important;border-color:var(--ink)!important}
+.lead .meta{font:700 12px var(--mono);color:var(--muted)}
+.lead.done{background:color-mix(in srgb,var(--teal) 14%,var(--card))}
+.lead.skip{opacity:.6;box-shadow:none}
+.lead .row button{font-size:13px;min-height:38px;padding:5px 10px}
+.badges{display:flex;flex-wrap:wrap;gap:6px}
+.bdg{font:800 10px var(--mono);letter-spacing:.05em;text-transform:uppercase;border:2px solid var(--stroke);border-radius:3px;padding:2px 6px;background:var(--card)}
+.bdg.y{background:var(--yellow);color:var(--on-accent);border-color:#000} .bdg.t{background:var(--teal);color:var(--on-accent);border-color:#000} .bdg.k{background:var(--ink);color:var(--paper)}
+.sel{background:var(--ink)!important;color:var(--paper)!important;box-shadow:none!important}
 .filters{display:flex;gap:6px;flex-wrap:wrap}
-.filters button{font-size:13px;padding:5px 10px}
-.gridwrap{overflow-x:auto}
+.filters button{font:800 11px var(--mono);min-height:36px;padding:4px 10px;text-transform:uppercase;box-shadow:2px 2px 0 var(--stroke)}
+.gridwrap{overflow-x:auto;border:var(--sw) solid var(--stroke);border-radius:var(--r)}
 table{border-collapse:collapse;width:100%;min-width:420px}
-th,td{padding:8px 4px;text-align:center;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
-th{font:500 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-td.name{text-align:left;font-weight:600;white-space:nowrap}
+th,td{padding:8px 3px;text-align:center;border-bottom:2px solid var(--stroke);font-variant-numeric:tabular-nums}
+thead tr{background:var(--ink)}
+th{font:800 10px var(--mono);letter-spacing:.04em;text-transform:uppercase;color:var(--paper)}
+td.name{text-align:left;padding-left:8px;font:900 16px var(--display);font-stretch:72%;text-transform:uppercase;white-space:nowrap}
 tr:last-child td{border-bottom:0}
-.hole{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;border:1.5px dashed var(--line);font:700 11px var(--mono);color:var(--muted)}
-.hole.part{border-style:solid;border-color:var(--muted);color:var(--ink)}
-.hole.full{background:var(--good);border-color:var(--good);color:var(--surface)}
-.tot{font:700 13px var(--mono);text-align:right;white-space:nowrap}
+.hole{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:3px;border:2px dashed var(--muted);font:800 11px var(--mono)}
+.hole.part{border:2px solid #000;background:var(--yellow);color:var(--on-accent)}
+.hole.full{border:2px solid #000;background:var(--teal);color:var(--on-accent);box-shadow:0 0 10px var(--glow)}
+.tot{font:800 13px var(--mono);text-align:right;white-space:nowrap;padding-right:8px}
 @media (max-width:480px){
   table{min-width:0}
   th,td{padding:6px 1px}
-  .hole{width:24px;height:24px;font-size:10px}
+  .hole{width:21px;height:21px;font-size:10px;border-width:2px}
+  th,td{padding:6px 0}
   td.name{max-width:64px;overflow:hidden;text-overflow:ellipsis;font-size:13px}
   .tot{font-size:11px}
 }
 .goalrow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .days{display:flex;flex-wrap:wrap;gap:6px}
-.days label{display:flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:6px;padding:4px 8px;font:500 12px var(--mono);cursor:pointer}
-.days input{width:auto}
-.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:8px 14px;border-radius:8px;font-size:14px;max-width:calc(100% - 32px)}
+.days label{display:flex;align-items:center;gap:6px;border:2px solid var(--stroke);border-radius:3px;padding:6px 8px;font:800 12px var(--mono);cursor:pointer;min-height:40px}
+.days label:has(input:checked){background:var(--yellow);color:var(--on-accent);border-color:#000}
+ol.deal{margin:0;padding-left:22px;display:grid;gap:6px;font-weight:600}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--yellow);color:var(--on-accent);border:var(--sw) solid #000;box-shadow:4px 4px 0 #000;padding:10px 14px;border-radius:var(--r);font-weight:800;max-width:calc(100% - 32px)}
 .gate{padding:40px 20px;text-align:center;display:grid;gap:10px;justify-items:center}
-a{color:var(--accent)}
+a{color:inherit}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
 <div class="top">
-  <div class="brand"><h1>Abro</h1><span id="clockNow"></span></div>
+  <div class="brand"><h1>Abro<i>አብሮ</i></h1><span id="clockNow"></span></div>
   <nav role="tablist" id="tabs">
     <button role="tab" data-tab="today" aria-selected="true">Today</button>
     <button role="tab" data-tab="todos">Todos<span class="badge" id="todoBadge"></span></button>
@@ -137,12 +148,13 @@ a{color:var(--accent)}
 (() => {
   const tg = window.Telegram && window.Telegram.WebApp;
   if (tg) { tg.ready(); tg.expand(); }
+  if (tg && tg.initData) { const setTheme = () => { const dark = tg.colorScheme === "dark"; document.documentElement.dataset.theme = dark ? "dark" : "light"; try { tg.setHeaderColor(dark ? "#0B0B0B" : "#F5F5DC"); tg.setBackgroundColor(dark ? "#0B0B0B" : "#F5F5DC"); } catch {} }; setTheme(); tg.onEvent("themeChanged", setTheme); }
   const initData = tg ? tg.initData : "";
 
   const $ = s => document.querySelector(s);
   const el = (tag, props = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(props)) { if (k === "class") e.className = v; else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else if (v != null && v !== false) e.setAttribute(k, v === true ? "" : v); } for (const c of kids.flat()) if (c != null && c !== false) e.append(c); return e; };
   const pad = n => String(n).padStart(2, "0");
-  const COUNTS = [["apps", "Applications"], ["outreach", "Outreach"], ["commits", "Commits"]];
+  const COUNTS = [["apps", "Apps sent"], ["outreach", "Outreach"], ["commits", "Commits"]];
   const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const safeUrl = u => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : null; } catch { return null; } };
 
@@ -182,7 +194,7 @@ a{color:var(--accent)}
     for (const b of $("#tabs").children) b.setAttribute("aria-selected", String(b.dataset.tab === tab));
     const myOpen = S.todos.filter(t => !t.done_at && (t.owner === S.me || t.owner === 0)).length;
     $("#todoBadge").textContent = myOpen ? String(myOpen) : "";
-    const openLeads = S.leads.filter(l => !l.status[S.me] && (l.for_who === 0 || l.for_who === S.me) && l.by !== S.me).length;
+    const openLeads = S.leads.filter(l => !l.status[S.me] && (l.forWho === 0 || l.forWho === S.me) && l.by !== S.me).length;
     $("#leadBadge").textContent = openLeads ? String(openLeads) : "";
     tickClock();
     const view = { today: viewToday, todos: viewTodos, leads: viewLeads, week: viewWeek, setup: viewSetup }[tab] || viewToday;
@@ -212,8 +224,8 @@ a{color:var(--accent)}
   function myCard() {
     const m = me(), d = m.today;
     const punch = el("div", { class: "punch" }, el("span", { class: d.in_at ? "on" : "" }, `IN ${hm(d.in_at, m.tz)}`), el("span", { class: d.out_at ? "on" : "" }, `OUT ${hm(d.out_at, m.tz)}`));
-    if (!d.in_at) punch.append(el("button", { class: "stampbtn", type: "button", onclick: () => { haptic("medium"); act("POST", "/day/clock", { action: "in" }); } }, "Clock in"));
-    else if (!d.out_at) punch.append(el("button", { class: "stampbtn", type: "button", onclick: () => { haptic("medium"); act("POST", "/day/clock", { action: "out" }); } }, "Clock out"));
+    if (!d.in_at) punch.append(el("button", { class: "stampbtn in", type: "button", onclick: () => { haptic("medium"); act("POST", "/day/clock", { action: "in" }); } }, "Clock in"));
+    else if (!d.out_at) punch.append(el("button", { class: "stampbtn out", type: "button", onclick: () => { haptic("medium"); act("POST", "/day/clock", { action: "out" }); } }, "Clock out"));
     const card = el("div", { class: "card me" }, el("div", { class: "who" }, el("b", {}, m.name), el("span", { class: "tag" }, "you · today")), punch, counts(m, d, true));
     for (const [k, label, ph] of [["plan", "Today's plan", "5 applications, finish the README, 1 cold email"], ["done", "What got done", "Fill in at clock-out"], ["blocker", "Blocked on", "Anything you need from your partner"]]) {
       const ta = el("textarea", { id: "t-" + k, maxlength: "2000", rows: k === "plan" ? "3" : "2", placeholder: ph });
@@ -269,39 +281,43 @@ a{color:var(--accent)}
       el("h2", {}, "Share a lead"),
       el("label", { class: "field" }, el("span", {}, "Role"), el("input", { id: "lTitle", maxlength: "160", required: true, placeholder: "Frontend Developer" })),
       el("label", { class: "field" }, el("span", {}, "Company"), el("input", { id: "lCompany", maxlength: "100", placeholder: "Acme" })),
-      el("label", { class: "field" }, el("span", {}, "Link"), el("input", { id: "lUrl", type: "url", maxlength: "600", placeholder: "https://…" })),
+      el("label", { class: "field" }, el("span", {}, "Link"), el("input", { id: "lUrl", type: "url", maxlength: "600", required: true, placeholder: "https://…" })),
       el("label", { class: "field" }, el("span", {}, "Who it's for"), el("select", { id: "lFor" }, el("option", { value: "0" }, "Both of us"), el("option", { value: String(S.me) }, "Me"), others.map(m => el("option", { value: String(m.id) }, m.name)))),
       el("label", { class: "field" }, el("span", {}, "Why it fits"), el("input", { id: "lNote", maxlength: "400", placeholder: "Remote, open worldwide, React + Node" })),
-      el("div", { class: "row", style: "justify-content:flex-end" }, el("button", { class: "primary", type: "submit" }, "Share lead")));
+      el("label", { class: "row", style: "gap:8px;font-weight:600" }, el("input", { id: "lEth", type: "checkbox", checked: true }), "Open to applicants in Ethiopia"),
+      el("p", { class: "hint" }, "Shared leads go live as public job listings on Apleo."),
+      el("div", { class: "row", style: "justify-content:flex-end" }, el("button", { class: "primary", type: "submit", disabled: !S.apleo }, "Share lead")));
     form.addEventListener("submit", async e => {
       e.preventDefault();
       const url = $("#lUrl").value.trim();
-      if (url && !safeUrl(url)) return toast("Links need to start with https://");
-      const body = { title: $("#lTitle").value.trim(), company: $("#lCompany").value.trim(), url, note: $("#lNote").value.trim(), forWho: Number($("#lFor").value) };
+      if (!safeUrl(url)) return toast("Links need to start with https://");
+      const body = { title: $("#lTitle").value.trim(), company: $("#lCompany").value.trim(), url, note: $("#lNote").value.trim(), forWho: Number($("#lFor").value), openToEthiopia: $("#lEth").checked };
       if (!body.title) return;
-      haptic(); if (await act("POST", "/leads", body)) toast("Shared with your partner.");
+      haptic(); if (await act("POST", "/leads", body)) toast("Shared. It's live on Apleo.");
     });
     const filters = el("div", { class: "filters" }, [["open", "Open"], ["mine", "For me"], ["all", "All"]].map(([f, label]) =>
       el("button", { type: "button", class: leadFilter === f ? "sel" : "", onclick: () => { leadFilter = f; render(); } }, label)));
     const my = l => l.status[S.me];
     let list = S.leads.slice();
-    if (leadFilter === "open") list = list.filter(l => !my(l) && (l.for_who === 0 || l.for_who === S.me || l.by === S.me));
-    if (leadFilter === "mine") list = list.filter(l => l.for_who === S.me || (l.for_who === 0 && l.by !== S.me));
-    const cards = list.length ? list.map(leadCard) : [el("p", { class: "hint" }, S.leads.length ? "Nothing in this view." : "No leads yet. Share the first role you find for either of you.")];
+    if (leadFilter === "open") list = list.filter(l => !my(l) && (l.forWho === 0 || l.forWho === S.me || l.by === S.me));
+    if (leadFilter === "mine") list = list.filter(l => l.forWho === S.me || (l.forWho === 0 && l.by !== S.me));
+    const cards = S.leadsError ? [el("div", { class: "card" }, el("b", {}, "Leads are offline"), el("p", { class: "hint" }, S.leadsError))]
+      : list.length ? list.map(leadCard) : [el("p", { class: "hint" }, S.leads.length ? "Nothing in this view." : "No leads yet. Share the first role you find for either of you.")];
     return [el("div", { class: "row", style: "justify-content:space-between" }, el("h2", {}, "Leads"), filters), ...cards, form];
   }
   function leadCard(l) {
     const s = l.status[S.me], url = safeUrl(l.url);
-    const forTxt = l.for_who === 0 ? "for both" : l.for_who === S.me ? "for you" : `for ${nameOf(l.for_who)}`;
+    const forTxt = l.forWho === 0 ? "for both" : l.forWho === S.me ? "for you" : `for ${nameOf(l.forWho)}`;
     const others = Object.entries(l.status).filter(([id, v]) => Number(id) !== S.me && v === "applied").map(([id]) => `${nameOf(Number(id))} applied`);
-    const when = new Date(l.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    const when = new Date(l.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short" });
     return el("div", { class: "card lead" + (s === "applied" ? " done" : s === "skip" ? " skip" : "") },
       el("h3", {}, url ? el("a", { href: url, target: "_blank", rel: "noopener", onclick: e => { if (tg) { e.preventDefault(); tg.openLink(url); } } }, l.title) : l.title),
-      el("div", { class: "meta" }, [l.company, `from ${nameOf(l.by)}`, forTxt, when, ...others].filter(Boolean).join(" · ")),
+      el("div", { class: "badges" }, el("span", { class: "bdg y" }, forTxt), l.published ? el("span", { class: "bdg t" }, "Live on Apleo") : el("span", { class: "bdg" }, "Expired"), s === "applied" ? el("span", { class: "bdg k" }, "You applied") : null),
+      el("div", { class: "meta" }, [l.company, l.by ? `from ${nameOf(l.by)}` : "", when, ...others].filter(Boolean).join(" · ")),
       l.note ? el("p", {}, l.note) : null,
       el("div", { class: "row" },
         [["applied", "I applied"], ["skip", "Not for me"]].map(([v, label]) => el("button", { type: "button", class: s === v ? "sel" : "", onclick: () => { haptic(); act("POST", `/leads/${l.id}/status`, { status: s === v ? null : v }); } }, label)),
-        l.by === S.me ? el("button", { type: "button", onclick: () => act("DELETE", `/leads/${l.id}`) }, "Remove") : null));
+        l.by === S.me ? el("button", { type: "button", onclick: () => act("DELETE", `/leads/${l.id}`) }, "Take down") : null));
   }
 
   // ---- Week ----------------------------------------------------------------
@@ -347,7 +363,7 @@ a{color:var(--accent)}
       const body = { days: [...sess.querySelectorAll(".days input:checked")].map(x => x.value), time: $("#s-time").value.trim(), link: $("#s-link").value.trim() };
       if (await act("POST", "/session", body)) toast("Saved.");
     });
-    const rules = el("div", { class: "card" }, el("h2", {}, "The deal"), el("ol", { style: "margin:0;padding-left:20px;display:grid;gap:6px" },
+    const rules = el("div", { class: "card" }, el("h2", {}, "The deal"), el("ol", { class: "deal" },
       ["Clock in with today's plan before you start.", "Hit your daily minimums and log them as they happen.", "Any role that fits the other person goes in Leads.", "Clock out with what got done and anything blocking you.", "Sunday: look at the Week tab together and adjust goals.", "Missed a day? Say so in your card and pick it back up tomorrow."].map(t => el("li", {}, t))));
     return [goals, sess, rules];
   }

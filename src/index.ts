@@ -1,12 +1,17 @@
 import { env } from "./env";
+import { connectDb } from "./db";
 import { COMMANDS, createBot } from "./bot";
 import { createServer } from "./server";
 import { startReminders } from "./reminders";
 import { setBot } from "./notify";
 import { members } from "./store";
+import { apleoReady } from "./apleo";
+
+await connectDb();
 
 // Local browser testing: make sure the dev member exists.
-if (env.devUserId && !members.get(env.devUserId)) members.upsert(env.devUserId, "Dev user");
+if (env.devUserId && !(await members.get(env.devUserId))) await members.upsert(env.devUserId, "Dev user");
+if (!apleoReady()) console.log("APLEO_API_URL / APLEO_API_KEY not set: leads are off until Apleo is connected.");
 
 const app = createServer();
 app.listen(env.port, () => console.log(`Abro board on http://localhost:${env.port}${env.publicUrl ? ` (public: ${env.publicUrl})` : ""}`));
