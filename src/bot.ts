@@ -5,6 +5,8 @@ import { dayKey, validTz } from "./time";
 import { boardReady, cardText, esc, todayText, weekText } from "./notify";
 import { addTodo, bump, clockIn, clockOut, shareLead } from "./actions";
 import { apleo } from "./apleo";
+import { feed } from "./feed";
+import { sendResume, addWork } from "./workActions";
 
 const HELP = `<b>Abro</b> · አብሮ · together, on the clock
 
@@ -23,6 +25,14 @@ const HELP = `<b>Abro</b> · አብሮ · together, on the clock
 <b>Leads</b> (posted publicly on Apleo)
 /lead <i>link role @ company | why it fits</i>
 /leads · open leads
+
+<b>Feed</b>
+/feed · today's picks: news, things to learn and try, project ideas
+/focus <i>text</i> · what you're working toward, so the feed fits you
+
+<b>Show your work</b>
+/built <i>what you made</i> · log it (then add it to your portfolio on the board)
+/resume · get your latest resume as PDF and Word
 
 <b>Team</b>
 /today · both time cards
@@ -204,6 +214,35 @@ export function createBot(): Bot<Ctx> | null {
     } catch { /* message unchanged or Apleo unreachable */ }
   });
 
+  bot.command("feed", async ctx => {
+    const items = await feed.today();
+    if (!items.length) return void reply(ctx, `Today's feed isn't built yet. It arrives at ${esc(env.feedAt)} (${esc(env.defaultTz)}).`, boardKeyboard(ctx));
+    const label: Record<string, string> = { news: "News", learn: "Learn", try: "Try", idea: "Idea", spark: "Fresh idea", improve: "Improve" };
+    const ms = await members.all();
+    const text = items.filter(i => i.for_member === 0 || i.for_member === ctx.member!.id).slice(0, 10).map(i => {
+      const who = i.for_member ? (i.for_member === ctx.member!.id ? " · for you" : ` · for ${esc(ms.find(m => m.id === i.for_member)?.name ?? "")}`) : "";
+      return `<b>${label[i.kind] ?? i.kind}</b>${who}\n${i.url ? `<a href="${esc(i.url)}">${esc(i.title)}</a>` : esc(i.title)}${i.body ? `\n<i>${esc(i.body.slice(0, 300))}</i>` : ""}`;
+    }).join("\n\n");
+    await reply(ctx, `<b>Today's feed</b>\n\n${text}`, boardKeyboard(ctx));
+  });
+  bot.command("focus", async ctx => {
+    const text = arg(ctx);
+    if (!text) return void reply(ctx, ctx.member!.focus ? `Your focus: <i>${esc(ctx.member!.focus)}</i>\nChange it with <code>/focus …</code>` : "Tell me what you're working toward, e.g.\n<code>/focus Frontend roles, React + TypeScript, want more backend skills</code>");
+    await members.setFocus(ctx.member!.id, text);
+    await reply(ctx, "Saved. Tomorrow's feed will use it.");
+  });
+
+  bot.command("built", async ctx => {
+    const text = arg(ctx);
+    if (!text) return void reply(ctx, "Say what you made, e.g. <code>/built Ticket triage agent with Gemini and Next.js</code>");
+    await addWork(ctx.member!, { kind: "project", title: text.slice(0, 160) });
+    await reply(ctx, "Logged in your work. Open You on the board to send it to your portfolio or resume.", boardKeyboard(ctx));
+  });
+  bot.command("resume", async ctx => {
+    try { await sendResume(ctx.member!); }
+    catch (e) { await reply(ctx, `${esc((e as Error).message)} Do it on the board under You → Resume.`, boardKeyboard(ctx)); }
+  });
+
   bot.command("today", async ctx => reply(ctx, await todayText(), boardKeyboard(ctx)));
   bot.command("week", async ctx => reply(ctx, await weekText()));
   bot.command("session", async ctx => {
@@ -241,7 +280,7 @@ export const COMMANDS = [
   ["app", "Log an application"], ["reach", "Log an outreach"], ["commit", "Log a commit"],
   ["todo", "Add a todo for you"], ["shared", "Add a shared todo"], ["todos", "List todos"], ["done", "Tick off a todo by number"],
   ["lead", "Share a job lead (posts to Apleo)"], ["leads", "Open leads"],
-  ["today", "Both time cards"], ["week", "The 7-day grid"], ["board", "Open the full board"],
+  ["feed", "Today's picks and ideas"], ["focus", "What you're working toward"], ["built", "Log something you made"], ["resume", "Get your resume (PDF + Word)"], ["today", "Both time cards"], ["week", "The 7-day grid"], ["board", "Open the full board"],
   ["plan", "Set today's plan"], ["blocked", "Say what's blocking you"],
   ["session", "When we meet"], ["goals", "Set daily minimums"], ["tz", "Set your time zone"], ["help", "All commands"],
 ].map(([command, description]) => ({ command, description }));

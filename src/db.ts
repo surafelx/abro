@@ -47,6 +47,53 @@ const SCHEMA = [
     PRIMARY KEY (lead, member)
   )`,
   `CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
+  `ALTER TABLE members ADD COLUMN IF NOT EXISTS focus TEXT NOT NULL DEFAULT ''`,
+  `CREATE TABLE IF NOT EXISTS feed_items (
+    id SERIAL PRIMARY KEY,
+    day TEXT NOT NULL,                   -- YYYY-MM-DD (DEFAULT_TZ) it was made for
+    kind TEXT NOT NULL,                  -- news | learn | try | idea | improve
+    for_member BIGINT NOT NULL DEFAULT 0, -- member id, or 0 for both
+    title TEXT NOT NULL,
+    url TEXT NOT NULL DEFAULT '',
+    body TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS works (
+    id SERIAL PRIMARY KEY,
+    member BIGINT NOT NULL,
+    kind TEXT NOT NULL,                  -- project | post | skill
+    title TEXT NOT NULL,
+    summary TEXT NOT NULL DEFAULT '',
+    details TEXT NOT NULL DEFAULT '',
+    stack TEXT NOT NULL DEFAULT '',      -- comma-separated
+    links TEXT NOT NULL DEFAULT '{}',    -- JSON {live, code, post}
+    status TEXT NOT NULL DEFAULT 'doing', -- doing | done
+    feed_item INTEGER,
+    portfolio_state TEXT NOT NULL DEFAULT 'none', -- none | draft | live
+    portfolio_url TEXT NOT NULL DEFAULT '',
+    in_resume BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS drafts (
+    id SERIAL PRIMARY KEY,
+    member BIGINT NOT NULL,
+    work INTEGER,
+    feed_item INTEGER,
+    platform TEXT NOT NULL,              -- linkedin | x | devto
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS profiles (member BIGINT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS resumes (member BIGINT PRIMARY KEY, data TEXT NOT NULL, target TEXT NOT NULL DEFAULT '', generated_at TEXT NOT NULL, published_at TEXT)`,
+  `CREATE TABLE IF NOT EXISTS portfolio_links (member BIGINT PRIMARY KEY, url TEXT NOT NULL, key_enc TEXT NOT NULL)`,
+  `ALTER TABLE feed_items ADD COLUMN IF NOT EXISTS origin TEXT NOT NULL DEFAULT ''`,
+  `CREATE TABLE IF NOT EXISTS feed_saves (
+    item INTEGER NOT NULL,
+    member BIGINT NOT NULL,
+    PRIMARY KEY (item, member)
+  )`,
 ];
 
 export async function connectDb() {

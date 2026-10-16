@@ -17,6 +17,13 @@ async function send(chat: number, text: string) {
 
 export const dm = (member: number, text: string) => send(member, text);
 
+/** Send a file to someone's private chat with the bot. */
+export async function sendFile(member: number, data: Buffer, filename: string, caption?: string) {
+  if (!bot) throw new Error("The bot isn't running, so it can't send files.");
+  const { InputFile } = await import("grammy");
+  await bot.api.sendDocument(member, new InputFile(data, filename), caption ? { caption } : {});
+}
+
 /**
  * Tell the team. Goes to the group chat when one is set (/setgroup), otherwise
  * to everyone except the person who did it. Skips the chat the action came from.

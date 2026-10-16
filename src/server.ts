@@ -1,8 +1,15 @@
 import crypto from "node:crypto";
 import path from "node:path";
 import express, { NextFunction, Request, Response } from "express";
+import { Bot, webhookCallback } from "grammy";
 import { env } from "./env";
-import { COUNT_KEYS, CountKey, Member, TEXT_KEYS, TextKey, canTouchTodo, days, goalsOf, leadStatus, members, session, todos } from "./store";
+import { COUNT_KEYS, CountKey, Member, TEXT_KEYS, TextKey, canTouchTodo, days, goalsOf, kv, leadStatus, members, session, todos } from "./store";
+import { buildDaily, buildSparks, feed } from "./feed";
+import { aiReady } from "./ai";
+import { tick } from "./reminders";
+import * as W from "./workActions";
+import { portfolio } from "./portfolio";
+import { Profile, drafts, emptyProfile, portfolioLinks, profiles, resumes, works } from "./work";
 import { convertTime, dayKey, lastDays, validTz } from "./time";
 import { addTodo, bump, clockIn, clockOut, shareLead } from "./actions";
 import { botUsername } from "./notify";
@@ -62,7 +69,7 @@ async function state(me: Member) {
       const week = lastDays(m.tz, 7);
       const byDate = new Map((await days.since(m.id, week[0])).map(d => [d.date, d]));
       return {
-        id: m.id, name: m.name, username: m.username, tz: m.tz, goals: goalsOf(m),
+        id: m.id, name: m.name, username: m.username, tz: m.tz, goals: goalsOf(m), focus: m.focus,
         date, today: await days.get(m.id, date),
         week: week.map(d => ({ date: d, day: byDate.get(d) ?? null })),
       };
@@ -74,10 +81,34 @@ async function state(me: Member) {
 }
 const fresh = async (req: AReq) => state((await members.get(req.member.id))!);
 
-export function createServer() {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function createServer(bot?: Bot<any> | null) {
   const app = express();
   app.set("trust proxy", false);
   app.use(express.json({ limit: "32kb" }));
+
+  // Webhook mode (free hosts that sleep): Telegram POSTs updates here.
+  if (bot && env.botMode === "webhook") app.post("/tg", webhookCallback(bot, "express", { secretToken: env.webhookSecret || undefined }));
+
+  // Signed, short-lived resume downloads (links come from /api/resume/links).
+  app.get("/files/resume/:file", async (req, res) => {
+    const m = /^(\d+)\.(pdf|docx)$/.exec(req.params.file);
+    if (!m || !W.checkFileSig(Number(m[1]), m[2], Number(req.query.exp), String(req.query.sig ?? ""))) return void res.status(403).send("This download link has expired. Open it again from Abro.");
+    try {
+      const member = await members.get(Number(m[1]));
+      if (!member) return void res.status(404).send("Not found");
+      const f = await W.resumeFiles(member);
+      res.setHeader("content-type", m[2] === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+      res.setHeader("content-disposition", `attachment; filename="${f.base}.${m[2]}"`);
+      res.send(m[2] === "pdf" ? f.pdf : f.docx);
+    } catch (e) { res.status(400).send((e as Error).message); }
+  });
+
+  // A free scheduler calls this every few minutes so reminders and the feed run on hosts that sleep.
+  app.get("/tick", (req, res) => {
+    if (!env.cronKey || req.query.key !== env.cronKey) return void res.status(401).json({ error: "Bad key." });
+    tick().then(() => res.json({ ok: true })).catch(e => { console.error(e); res.status(500).json({ error: "Tick failed." }); });
+  });
   app.use(express.static(path.resolve("public"), { extensions: ["html"] }));
 
   const api = express.Router();
@@ -150,6 +181,7 @@ export function createServer() {
   api.post("/me", wrap(async (req, res) => {
     const g = req.body?.goals;
     if (g && typeof g === "object") await members.setGoals(req.member.id, { apps: Number(g.apps), outreach: Number(g.outreach), commits: Number(g.commits) });
+    if (typeof req.body?.focus === "string") await members.setFocus(req.member.id, str(req.body.focus, 500));
     const tz = str(req.body?.tz, 64);
     if (tz) { if (!validTz(tz)) return res.status(400).json({ error: "Unknown time zone." }); await members.setTz(req.member.id, tz); }
     res.json(await fresh(req));
@@ -162,6 +194,124 @@ export function createServer() {
     await session.set({ days: d, time, link: str(req.body?.link, 300) });
     res.json(await fresh(req));
   }));
+
+  api.get("/feed", wrap(async (_req, res) => res.json({ items: await feed.list(80), saves: await feed.saves(), ai: aiReady() })));
+  api.post("/feed/:id/save", wrap(async (req, res) => {
+    const item = await feed.get(Number(req.params.id));
+    if (!item) return res.status(404).json({ error: "That item is gone." });
+    await feed.toggleSave(item.id, req.member.id);
+    res.json({ items: await feed.list(80), saves: await feed.saves(), ai: aiReady() });
+  }));
+  api.post("/feed/sparks", wrap(async (_req, res) => {
+    if (!aiReady()) return res.status(400).json({ error: "Fresh ideas need an AI key on the server (GEMINI_API_KEY or OPENROUTER_API_KEY)." });
+    const last = Number((await kv.get("feed:lastSparks")) ?? 0);
+    if (Date.now() - last < 30 * 60_000) return res.status(429).json({ error: "New ideas were made in the last 30 minutes. Try again later." });
+    await kv.set("feed:lastSparks", String(Date.now()));
+    const added = await buildSparks().catch(e => { console.error(e); return 0; });
+    res.json({ added, items: await feed.list(80), saves: await feed.saves(), ai: aiReady() });
+  }));
+  api.post("/feed/refresh", wrap(async (_req, res) => {
+    const last = Number((await kv.get("feed:lastRefresh")) ?? 0);
+    if (Date.now() - last < 60 * 60_000) return res.status(429).json({ error: "The feed was refreshed in the last hour. Try again later." });
+    await kv.set("feed:lastRefresh", String(Date.now()));
+    const r = await buildDaily();
+    res.json({ added: r.added, items: await feed.list(80), saves: await feed.saves(), ai: aiReady() });
+  }));
+
+  // ---- Do, work, writing, portfolio, resume ----
+  const act = (fn: (req: AReq, res: Response) => Promise<unknown>) => wrap(async (req, res) => {
+    try { await fn(req, res); }
+    catch (e) {
+      if (e instanceof TypeError || e instanceof ReferenceError) throw e;
+      res.status(400).json({ error: (e as Error).message });
+    }
+  });
+  const you = async (m: Member) => {
+    const r = await resumes.get(m.id);
+    return {
+      works: await works.list(m.id),
+      drafts: await drafts.list(m.id),
+      profile: await profiles.get(m.id),
+      resume: r ? { data: r.data, target: r.target, generatedAt: r.generated_at, publishedAt: r.published_at } : null,
+      portfolio: { url: await portfolioLinks.urlOf(m.id) },
+      ai: aiReady(),
+    };
+  };
+  const id = (req: Request) => Number(req.params.id);
+  const LINK = (v: unknown) => (typeof v === "string" && /^https?:\/\//.test(v.trim()) ? v.trim().slice(0, 600) : "");
+  const links = (v: unknown) => { const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>; return { live: LINK(o.live), code: LINK(o.code), post: LINK(o.post) }; };
+
+  api.get("/you", act(async (req, res) => res.json(await you(req.member))));
+  api.post("/feed/:id/do", act(async (req, res) => {
+    const action = req.body?.action;
+    if (!["todo", "project", "write"].includes(action)) return void res.status(400).json({ error: "Bad action." });
+    const r = await W.doFromFeed(req.member, id(req), action);
+    res.json({ ...r, you: await you(req.member) });
+  }));
+  api.post("/works", act(async (req, res) => {
+    const kind = ["project", "post", "skill"].includes(req.body?.kind) ? req.body.kind : "project";
+    await W.addWork(req.member, { kind, title: str(req.body?.title, 160), summary: str(req.body?.summary, 400), details: str(req.body?.details, 4000), stack: str(req.body?.stack, 300), links: links(req.body?.links) });
+    res.json(await you(req.member));
+  }));
+  api.patch("/works/:id", act(async (req, res) => {
+    const b = req.body ?? {};
+    await W.updateWork(req.member, id(req), {
+      title: b.title !== undefined ? str(b.title, 160) : undefined, summary: b.summary !== undefined ? str(b.summary, 400) : undefined,
+      details: b.details !== undefined ? str(b.details, 4000) : undefined, stack: b.stack !== undefined ? str(b.stack, 300) : undefined,
+      links: b.links !== undefined ? links(b.links) : undefined, in_resume: typeof b.in_resume === "boolean" ? b.in_resume : undefined,
+      kind: ["project", "post", "skill"].includes(b.kind) ? b.kind : undefined,
+    });
+    res.json(await you(req.member));
+  }));
+  api.post("/works/:id/done", act(async (req, res) => { await W.finishWork(req.member, id(req), req.body?.done !== false); res.json(await you(req.member)); }));
+  api.post("/works/:id/write", act(async (req, res) => {
+    const platforms = (Array.isArray(req.body?.platforms) ? req.body.platforms : ["linkedin", "x", "devto"]).filter((p: string) => ["linkedin", "x", "devto"].includes(p));
+    const n = await W.writeAbout(req.member, { workId: id(req) }, platforms);
+    res.json({ message: `Drafted ${n} post${n === 1 ? "" : "s"}.`, you: await you(req.member) });
+  }));
+  api.post("/works/:id/portfolio", act(async (req, res) => { const r = await W.toPortfolio(req.member, id(req)); res.json({ ...r, you: await you(req.member) }); }));
+  api.post("/works/:id/publish", act(async (req, res) => { await W.setPublished(req.member, id(req), req.body?.live !== false); res.json(await you(req.member)); }));
+  api.delete("/works/:id/portfolio", act(async (req, res) => { await W.removeFromPortfolio(req.member, id(req)); res.json(await you(req.member)); }));
+  api.delete("/works/:id", act(async (req, res) => { await W.deleteWork(req.member, id(req)); res.json(await you(req.member)); }));
+  api.delete("/drafts/:id", act(async (req, res) => {
+    const d = await drafts.get(id(req));
+    if (!d || d.member !== req.member.id) return void res.status(404).json({ error: "That draft is gone." });
+    await drafts.remove(d.id); res.json(await you(req.member));
+  }));
+
+  api.put("/profile", act(async (req, res) => {
+    const b = (req.body?.profile ?? {}) as Partial<Profile>;
+    const arr = <T,>(v: unknown, max: number) => (Array.isArray(v) ? (v as T[]).slice(0, max) : []);
+    const clean: Profile = {
+      ...emptyProfile(),
+      name: str(b.name, 100), headline: str(b.headline, 160), location: str(b.location, 100), email: str(b.email, 160), website: LINK(b.website),
+      summary: str(b.summary, 1200),
+      links: arr<{ label: string; url: string }>(b.links, 6).map(l => ({ label: str(l?.label, 40), url: LINK(l?.url) })).filter(l => l.url),
+      experience: arr<Profile["experience"][number]>(b.experience, 12).map(e => ({ title: str(e?.title, 120), org: str(e?.org, 120), when: str(e?.when, 60), summary: str(e?.summary, 600), bullets: arr<string>(e?.bullets, 8).map(x => str(x, 300)).filter(Boolean) })).filter(e => e.title || e.org),
+      education: arr<Profile["education"][number]>(b.education, 6).map(e => ({ title: str(e?.title, 120), org: str(e?.org, 120), when: str(e?.when, 60) })).filter(e => e.title || e.org),
+      skills: arr<Profile["skills"][number]>(b.skills, 8).map(g => ({ group: str(g?.group, 60), items: arr<string>(g?.items, 30).map(x => str(x, 60)).filter(Boolean) })).filter(g => g.items.length),
+    };
+    await profiles.set(req.member.id, clean);
+    res.json(await you(req.member));
+  }));
+  api.post("/profile/import", act(async (req, res) => { await W.importProfile(req.member); res.json(await you(req.member)); }));
+  api.post("/resume/generate", act(async (req, res) => { await W.generateResume(req.member, str(req.body?.target, 200)); res.json(await you(req.member)); }));
+  api.post("/resume/send", act(async (req, res) => { await W.sendResume(req.member); res.json({ message: "Sent to your chat with the bot." }); }));
+  api.post("/resume/publish", act(async (req, res) => { const r = await W.publishResume(req.member); res.json({ message: "Your portfolio has the new resume.", ...r, you: await you(req.member) }); }));
+  api.get("/resume/links", act(async (req, res) => {
+    if (!(await resumes.get(req.member.id))) return void res.status(400).json({ error: "Generate your resume first." });
+    const base = env.publicUrl || `${req.protocol}://${req.get("host")}`;
+    res.json({ pdf: base + W.signedFileUrl(req.member.id, "pdf"), docx: base + W.signedFileUrl(req.member.id, "docx") });
+  }));
+  api.put("/portfolio", act(async (req, res) => {
+    const url = LINK(req.body?.url), key = str(req.body?.key, 300);
+    if (!url || !key) return void res.status(400).json({ error: "Give your portfolio API's address (https://…/api/abro) and its key." });
+    try { await portfolio.test(url, key); }
+    catch (e) { return void res.status(400).json({ error: `Not saved: ${(e as Error).message}` }); }
+    await portfolioLinks.set(req.member.id, url, key);
+    res.json({ message: "Portfolio linked and working.", you: await you(req.member) });
+  }));
+  api.delete("/portfolio", act(async (req, res) => { await portfolioLinks.remove(req.member.id); res.json(await you(req.member)); }));
 
   app.use("/api", api);
   app.get("/healthz", (_req, res) => res.json({ ok: true }));

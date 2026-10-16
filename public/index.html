@@ -28,17 +28,17 @@
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--paper);color:var(--ink);font:15px/1.5 var(--body);-webkit-font-smoothing:antialiased}
-.top{position:sticky;top:0;z-index:5;background:var(--paper);padding:12px max(14px,env(safe-area-inset-right)) 10px max(14px,env(safe-area-inset-left));border-bottom:var(--sw) solid var(--stroke)}
-.brand{display:flex;align-items:center;justify-content:space-between;gap:8px;max-width:720px;margin:0 auto}
-.brand h1{margin:0;font:900 36px/.9 var(--display);font-stretch:62%;text-transform:uppercase;letter-spacing:.01em;display:flex;align-items:center;gap:8px}
-.brand h1 i{font:800 15px/1 var(--body);font-style:normal;background:var(--yellow);color:var(--on-accent);padding:4px 6px;border:2px solid #000;border-radius:3px;box-shadow:2px 2px 0 var(--stroke)}
-.brand span{font:800 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;background:var(--ink);color:var(--paper);padding:4px 8px;border-radius:3px}
-nav{display:flex;gap:6px;overflow-x:auto;margin:12px auto 0;max-width:720px;scrollbar-width:none;padding:0 4px 4px 0}
-nav button{flex:1;min-height:40px;box-shadow:none;border:2px solid var(--stroke);border-radius:3px;background:var(--card);color:var(--ink);font:800 13px var(--display);font-stretch:75%;letter-spacing:.04em;text-transform:uppercase;padding:6px 8px;cursor:pointer;white-space:nowrap}
-nav button[aria-selected="true"]{background:var(--teal);color:var(--on-accent);border-color:#000;box-shadow:3px 3px 0 var(--stroke),0 0 14px var(--glow)}
-nav .badge:empty{display:none}
-nav .badge{font:800 10px var(--mono);background:var(--yellow);color:var(--on-accent);border:2px solid #000;border-radius:3px;padding:0 4px;margin-left:5px}
-main{padding:18px max(14px,env(safe-area-inset-right)) 48px max(14px,env(safe-area-inset-left));display:grid;gap:20px;max-width:720px;margin:0 auto}
+.top{position:sticky;top:0;z-index:5;background:var(--paper);padding:12px max(16px,env(safe-area-inset-right)) 12px max(16px,env(safe-area-inset-left));border-bottom:var(--sw) solid var(--stroke)}
+.appbar{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;max-width:720px;margin:0 auto}
+.appbar .ttl{min-width:0}
+.eyebrow{display:flex;align-items:center;gap:6px;font:800 11px var(--mono);letter-spacing:.08em;text-transform:uppercase}
+.eyebrow b{background:var(--ink);color:var(--paper);padding:2px 6px;border-radius:3px;letter-spacing:.12em}
+.eyebrow i{font:800 12px/1 var(--body);font-style:normal;background:var(--yellow);color:var(--on-accent);border:2px solid #000;border-radius:3px;padding:1px 5px}
+.appbar h1{margin:6px 0 0;font:900 40px/.86 var(--display);font-stretch:62%;text-transform:uppercase;letter-spacing:.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appbar .sub{margin-top:5px;font:700 12px var(--mono);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appbar .side{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex:none}
+#clockNow{font:800 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;border:2px solid var(--stroke);border-radius:3px;padding:3px 7px;background:var(--card)}
+main{padding:18px max(14px,env(safe-area-inset-right)) calc(112px + env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));display:grid;gap:20px;max-width:720px;margin:0 auto}
 .card{background:var(--card);border:var(--sw) solid var(--stroke);border-radius:var(--r);box-shadow:var(--sh2);padding:14px;display:grid;gap:12px;min-width:0;margin-right:6px}
 .card.me{box-shadow:var(--sh2),0 0 22px var(--glow)}
 .who{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -99,7 +99,7 @@ h2{margin:0;font:900 26px/1 var(--display);font-stretch:66%;text-transform:upper
 .bdg.y{background:var(--yellow);color:var(--on-accent);border-color:#000} .bdg.t{background:var(--teal);color:var(--on-accent);border-color:#000} .bdg.k{background:var(--ink);color:var(--paper)}
 .sel{background:var(--ink)!important;color:var(--paper)!important;box-shadow:none!important}
 .filters{display:flex;gap:6px;flex-wrap:wrap}
-.filters button{font:800 11px var(--mono);min-height:36px;padding:4px 10px;text-transform:uppercase;box-shadow:2px 2px 0 var(--stroke)}
+.slim,.filters button{font:800 11px var(--mono);min-height:36px;padding:4px 10px;text-transform:uppercase;box-shadow:2px 2px 0 var(--stroke)}
 .gridwrap{overflow-x:auto;border:var(--sw) solid var(--stroke);border-radius:var(--r)}
 table{border-collapse:collapse;width:100%;min-width:420px}
 th,td{padding:8px 3px;text-align:center;border-bottom:2px solid var(--stroke);font-variant-numeric:tabular-nums}
@@ -125,6 +125,49 @@ tr:last-child td{border-bottom:0}
 .days label:has(input:checked){background:var(--yellow);color:var(--on-accent);border-color:#000}
 ol.deal{margin:0;padding-left:22px;display:grid;gap:6px;font-weight:600}
 .toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--yellow);color:var(--on-accent);border:var(--sw) solid #000;box-shadow:4px 4px 0 #000;padding:10px 14px;border-radius:var(--r);font-weight:800;max-width:calc(100% - 32px)}
+.gear{min-height:40px;width:40px;padding:0;display:grid;place-items:center;box-shadow:2px 2px 0 var(--stroke)}
+.gear svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:square}
+.gear.on{background:var(--yellow);color:var(--on-accent);border-color:#000}
+/* Floating dock: icons only; the active tab grows into a labelled teal block. */
+.tabbar{position:fixed;z-index:6;left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));
+  max-width:520px;margin:0 auto;display:flex;gap:6px;padding:6px;background:var(--card);border:var(--sw) solid var(--stroke);border-radius:12px;box-shadow:5px 5px 0 var(--stroke)}
+.tabbar button{position:relative;flex:1 1 0;min-width:0;min-height:54px;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 10px;border:2px solid transparent;border-radius:8px;box-shadow:none;background:none;color:var(--ink);
+  font:900 15px var(--display);font-stretch:72%;letter-spacing:.04em;text-transform:uppercase;transition:flex-grow .22s cubic-bezier(.3,1.4,.5,1),background-color .15s}
+.tabbar button span{display:none;white-space:nowrap}
+.tabbar button:hover{background:var(--well)}
+.tabbar button:active{transform:translate(2px,2px)}
+.tabbar svg{width:26px;height:26px;flex:none;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:square;stroke-linejoin:miter}
+.tabbar button[aria-selected="true"]{flex-grow:2.3;background:var(--teal);color:var(--on-accent);border-color:#000;box-shadow:3px 3px 0 #000,0 0 16px var(--glow)}
+.tabbar button[aria-selected="true"] span{display:inline}
+.tabbar .badge{position:absolute;top:5px;left:calc(50% + 6px);min-width:18px;height:18px;display:grid;place-items:center;font:800 10px/1 var(--mono);background:var(--magenta);color:#000;border:2px solid #000;border-radius:3px;padding:0 3px}
+.tabbar button[aria-selected="true"] .badge{position:static;background:var(--yellow)}
+.tabbar .badge:empty{display:none}
+@media (prefers-reduced-motion:reduce){.tabbar button{transition:none}}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);border:var(--sw) solid var(--stroke);border-radius:var(--r);overflow:hidden;box-shadow:var(--sh1)}
+.seg button{border:0;border-radius:0;box-shadow:none;min-height:42px;font:800 12px var(--mono);text-transform:uppercase;letter-spacing:.05em;background:var(--card)}
+.seg button+button{border-left:var(--sw) solid var(--stroke)}
+.seg button.on{background:var(--ink);color:var(--paper)}
+.dorow{display:flex;gap:6px;flex-wrap:wrap}
+.dorow button{font:800 11px var(--mono);text-transform:uppercase;min-height:34px;padding:4px 10px;box-shadow:2px 2px 0 var(--stroke)}
+.dorow button.go{background:var(--yellow);color:var(--on-accent);border-color:#000}
+details.card>summary{cursor:pointer;font:900 20px var(--display);font-stretch:70%;text-transform:uppercase;list-style:none}
+details.card>summary::-webkit-details-marker{display:none}
+details.card>summary::after{content:"+";float:right;font-family:var(--mono)}
+details.card[open]>summary::after{content:"–"}
+.post{white-space:pre-wrap;font:14px/1.5 var(--body);background:var(--well);border:2px solid var(--stroke);border-radius:3px;padding:10px;margin:0;overflow-wrap:anywhere}
+.paper{background:#fff;color:#111;border:var(--sw) solid var(--stroke);border-radius:var(--r);box-shadow:var(--sh2);padding:22px 20px;font:13px/1.45 var(--body);margin-right:6px}
+.paper h3{margin:0;font:800 22px/1.1 var(--body);color:#111}
+.paper .hl{color:#0A7F86;font-weight:600;margin-top:2px}
+.paper .ct{color:#555;font-size:11.5px;margin-top:4px;overflow-wrap:anywhere}
+.paper h4{margin:14px 0 6px;font:800 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;border-bottom:2px solid #111;padding-bottom:2px;color:#111}
+.paper .ln{display:flex;justify-content:space-between;gap:8px;font-weight:700;margin-top:6px}
+.paper .ln span{font-weight:400;color:#555;font-size:11.5px;white-space:nowrap}
+.paper ul{margin:3px 0 0;padding-left:18px}
+.paper .mt{color:#555;font-size:11px}
+details.origin{border-left:var(--sw) solid var(--magenta);padding:2px 0 2px 10px}
+details.origin>summary{cursor:pointer;font:800 11px var(--mono);letter-spacing:.06em;text-transform:uppercase}
+details.origin p{margin:6px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
+.slim.go{background:var(--magenta);color:#000;border-color:#000}
 .gate{padding:40px 20px;text-align:center;display:grid;gap:10px;justify-items:center}
 a{color:inherit}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -132,16 +175,23 @@ a{color:inherit}
 </head>
 <body>
 <div class="top">
-  <div class="brand"><h1>Abro<i>አብሮ</i></h1><span id="clockNow"></span></div>
-  <nav role="tablist" id="tabs">
-    <button role="tab" data-tab="today" aria-selected="true">Today</button>
-    <button role="tab" data-tab="todos">Todos<span class="badge" id="todoBadge"></span></button>
-    <button role="tab" data-tab="leads">Leads<span class="badge" id="leadBadge"></span></button>
-    <button role="tab" data-tab="week">Week</button>
-    <button role="tab" data-tab="setup">Setup</button>
-  </nav>
+  <div class="appbar">
+    <div class="ttl">
+      <div class="eyebrow"><b>Abro</b><i>አብሮ</i></div>
+      <h1 id="pageTitle">Today</h1>
+      <div class="sub" id="pageSub"></div>
+    </div>
+    <div class="side"><button type="button" class="gear" id="gearBtn" aria-label="Setup"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><rect x="14" y="4" width="4" height="4"/><rect x="8" y="10" width="4" height="4"/><rect x="16" y="16" width="4" height="4"/></svg></button><span id="clockNow"></span></div>
+  </div>
 </div>
 <main id="main"><div class="gate"><p class="hint">Loading the board…</p></div></main>
+<nav class="tabbar" role="tablist" id="tabs">
+  <button role="tab" data-tab="today" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Today</span></button>
+  <button role="tab" data-tab="feed"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg><span>Feed</span><b class="badge" id="feedBadge"></b></button>
+  <button role="tab" data-tab="leads"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="1"/><path d="M9 7V4h6v3M3 12h18"/></svg><span>Leads</span><b class="badge" id="leadBadge"></b></button>
+  <button role="tab" data-tab="todos"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="m7 12 3 3 7-7"/></svg><span>Todos</span><b class="badge" id="todoBadge"></b></button>
+  <button role="tab" data-tab="you"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>You</span><b class="badge" id="youBadge"></b></button>
+</nav>
 <div class="toast" id="toast" hidden></div>
 
 <script>
@@ -152,14 +202,15 @@ a{color:inherit}
   const initData = tg ? tg.initData : "";
 
   const $ = s => document.querySelector(s);
-  const el = (tag, props = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(props)) { if (k === "class") e.className = v; else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else if (v != null && v !== false) e.setAttribute(k, v === true ? "" : v); } for (const c of kids.flat()) if (c != null && c !== false) e.append(c); return e; };
+  const el = (tag, props = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(props)) { if (k === "class") e.className = v; else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else if (v != null && v !== false) e.setAttribute(k, v === true ? "" : v); } for (const c of kids.flat(Infinity)) if (c != null && c !== false) e.append(c); return e; };
   const pad = n => String(n).padStart(2, "0");
   const COUNTS = [["apps", "Apps sent"], ["outreach", "Outreach"], ["commits", "Commits"]];
   const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const safeUrl = u => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : null; } catch { return null; } };
 
-  let S = null, tab = "today", leadFilter = "open", busy = false;
+  let S = null, F = null, Y = null, youSeg = "work", tab = "today", leadFilter = "open", feedFilter = "all", busy = false;
   try { tab = sessionStorage.getItem("abro-tab") || "today"; } catch {}
+  if (!["today", "feed", "leads", "todos", "you", "setup"].includes(tab)) tab = "today";
 
   function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 2200); }
   function haptic(kind = "light") { try { tg && tg.HapticFeedback.impactOccurred(kind); } catch {} }
@@ -186,20 +237,38 @@ a{color:inherit}
   const hitAll = (m, d) => !!d && COUNTS.every(([k]) => d[k] >= m.goals[k]);
 
   function setTab(t) { tab = t; try { sessionStorage.setItem("abro-tab", t); } catch {} render(); window.scrollTo(0, 0); }
-  $("#tabs").addEventListener("click", e => { const b = e.target.closest("button[data-tab]"); if (b) setTab(b.dataset.tab); });
+  $("#tabs").addEventListener("click", e => { const b = e.target.closest("button[data-tab]"); if (b) { haptic(); setTab(b.dataset.tab); } });
+  $("#gearBtn").addEventListener("click", () => { haptic(); setTab(tab === "setup" ? "today" : "setup"); });
 
+  function setTitle() {
+    const m = me(), d = m.today;
+    const goals = COUNTS.filter(([k]) => d[k] >= m.goals[k] && m.goals[k] > 0).length;
+    const today = m.date;
+    const sub = {
+      today: `${goals}/3 goals · ${d.out_at ? "out " + hm(d.out_at, m.tz) : d.in_at ? "in " + hm(d.in_at, m.tz) : "not in yet"}`,
+      feed: F ? `${F.items.filter(i => i.day === today && (i.for_member === 0 || i.for_member === S.me)).length} picks today` : "Loading…",
+      leads: `${S.leads.filter(l => !l.status[S.me] && (l.forWho === 0 || l.forWho === S.me)).length} open for you`,
+      todos: `${S.todos.filter(t => !t.done_at && (t.owner === S.me || t.owner === 0)).length} open`,
+      you: Y ? `${Y.works.filter(w => w.status === "doing").length} doing · ${Y.works.filter(w => w.portfolio_state === "live").length} live on portfolio` : "Work, writing and resume",
+      setup: "Goals, focus, sessions, portfolio",
+    }[tab] || "";
+    $("#pageTitle").textContent = { today: "Today", feed: "Feed", leads: "Leads", todos: "Todos", you: "You", setup: "Setup" }[tab] || "Abro";
+    $("#pageSub").textContent = sub;
+  }
   function tickClock() { if (!S) return; const m = me(); $("#clockNow").textContent = `${new Intl.DateTimeFormat(undefined, { timeZone: m.tz, weekday: "short", day: "numeric", month: "short" }).format(new Date())} · ${hm(new Date().toISOString(), m.tz)}`; }
 
   function render() {
     for (const b of $("#tabs").children) b.setAttribute("aria-selected", String(b.dataset.tab === tab));
+    $("#gearBtn").classList.toggle("on", tab === "setup");
+    setTitle();
     const myOpen = S.todos.filter(t => !t.done_at && (t.owner === S.me || t.owner === 0)).length;
     $("#todoBadge").textContent = myOpen ? String(myOpen) : "";
     const openLeads = S.leads.filter(l => !l.status[S.me] && (l.forWho === 0 || l.forWho === S.me) && l.by !== S.me).length;
     $("#leadBadge").textContent = openLeads ? String(openLeads) : "";
-    tickClock();
-    const view = { today: viewToday, todos: viewTodos, leads: viewLeads, week: viewWeek, setup: viewSetup }[tab] || viewToday;
+    tickClock(); updateFeedBadge();
+    const view = { today: viewToday, feed: viewFeed, todos: viewTodos, leads: viewLeads, you: viewYou, setup: viewSetup }[tab] || viewToday;
     const focused = document.activeElement && document.activeElement.id;
-    $("#main").replaceChildren(...[].concat(view()));
+    $("#main").replaceChildren(...[].concat(view()).filter(Boolean));
     if (focused) { const f = document.getElementById(focused); if (f) f.focus(); }
   }
 
@@ -209,6 +278,7 @@ a{color:inherit}
     const out = [myCard()];
     for (const m of S.members) if (m.id !== S.me) out.push(partnerCard(m));
     if (S.members.length < 2) out.push(el("div", { class: "card" }, el("b", {}, "Waiting for your partner"), el("p", { class: "hint" }, `They message @${S.bot || "the bot"} and you approve them. Their card shows up here.`)));
+    out.push(...viewWeek());
     return out;
   }
   function counts(m, d, editable) {
@@ -303,7 +373,7 @@ a{color:inherit}
     if (leadFilter === "mine") list = list.filter(l => l.forWho === S.me || (l.forWho === 0 && l.by !== S.me));
     const cards = S.leadsError ? [el("div", { class: "card" }, el("b", {}, "Leads are offline"), el("p", { class: "hint" }, S.leadsError))]
       : list.length ? list.map(leadCard) : [el("p", { class: "hint" }, S.leads.length ? "Nothing in this view." : "No leads yet. Share the first role you find for either of you.")];
-    return [el("div", { class: "row", style: "justify-content:space-between" }, el("h2", {}, "Leads"), filters), ...cards, form];
+    return [el("div", { class: "row", style: "justify-content:flex-end" }, filters), ...cards, form];
   }
   function leadCard(l) {
     const s = l.status[S.me], url = safeUrl(l.url);
@@ -338,16 +408,272 @@ a{color:inherit}
       el("div", { class: "gridwrap" }, el("table", {}, el("thead", {}, head), el("tbody", {}, rows))))];
   }
 
+
+  // ---- Feed ----------------------------------------------------------------
+  const KIND = { news: ["News", "y"], learn: ["Learn", "t"], try: ["Try", "m"], idea: ["Project idea", "y"], spark: ["Fresh idea", "m"], improve: ["Improve", "k"] };
+  const SPARK_TYPE = { build: "Build", write: "Write", try: "Try" };
+  // Plain text with bare URLs → text nodes and links.
+  const linkify = t => t.split(/(https?:\/\/\S+)/g).map(part => /^https?:\/\//.test(part) && safeUrl(part)
+    ? el("a", { href: part, target: "_blank", rel: "noopener", onclick: e => { if (tg) { e.preventDefault(); tg.openLink(part); } } }, part.replace(/^https?:\/\/(www\.)?/, "").slice(0, 48))
+    : document.createTextNode(part));
+  async function loadFeed() {
+    try { F = await api("GET", "/feed"); if (tab === "feed") render(); else updateFeedBadge(); }
+    catch (e) { F = { items: [], saves: {}, error: e.message }; if (tab === "feed") render(); }
+  }
+  function updateFeedBadge() {
+    if (!F || !S) return;
+    const today = me().date;
+    const n = F.items.filter(i => i.day === today && (i.for_member === 0 || i.for_member === S.me)).length;
+    $("#feedBadge").textContent = n ? String(n) : "";
+  }
+  function feedCard(i) {
+    const [label, tone] = KIND[i.kind] || [i.kind, ""];
+    const saved = (F.saves[i.id] || []).includes(S.me);
+    const others = (F.saves[i.id] || []).filter(id => id !== S.me).map(id => `${nameOf(id)} saved`);
+    const url = safeUrl(i.url);
+    const forTxt = i.for_member === 0 ? null : i.for_member === S.me ? "for you" : `for ${nameOf(i.for_member)}`;
+    return el("div", { class: "card lead" + (i.kind === "improve" ? " me" : "") },
+      el("div", { class: "badges" }, el("span", { class: "bdg " + tone }, label), i.kind === "spark" && SPARK_TYPE[i.source] ? el("span", { class: "bdg k" }, SPARK_TYPE[i.source]) : null, forTxt ? el("span", { class: "bdg" }, forTxt) : null, others.length ? el("span", { class: "bdg t" }, others.join(", ")) : null),
+      el("h3", {}, url ? el("a", { href: url, target: "_blank", rel: "noopener", onclick: e => { if (tg) { e.preventDefault(); tg.openLink(url); } } }, i.title) : i.title),
+      i.body ? el("p", { style: "white-space:pre-wrap" }, i.body) : null,
+      i.origin ? el("details", { class: "origin" }, el("summary", {}, "How this came up"), el("p", {}, linkify(i.origin))) : null,
+      i.kind !== "improve" ? el("div", { class: "dorow" },
+        el("button", { type: "button", onclick: () => feedDo(i.id, "todo") }, "+ Todo"),
+        el("button", { type: "button", class: "go", onclick: () => feedDo(i.id, "project") }, i.kind === "learn" ? "Learn it" : i.kind === "idea" ? "Build it" : "Do it"),
+        el("button", { type: "button", onclick: () => feedDo(i.id, "write") }, "Write about it")) : null,
+      el("div", { class: "row", style: "justify-content:space-between" },
+        el("span", { class: "meta" }, i.kind === "spark" ? "Made for you" : i.source),
+        el("button", { type: "button", class: saved ? "sel" : "", onclick: async () => { haptic(); try { F = await api("POST", `/feed/${i.id}/save`); render(); } catch (e) { toast(e.message); } } }, saved ? "Saved" : "Save")));
+  }
+  function viewFeed() {
+    if (!F) { loadFeed(); return [el("p", { class: "hint" }, "Loading the feed…")]; }
+    if (F.error) return [el("div", { class: "card" }, el("b", {}, "The feed didn't load"), el("p", { class: "hint" }, F.error))];
+    const filters = el("div", { class: "filters" }, [["all", "All"], ["mine", "For me"], ["saved", "Saved"]].map(([f, label]) =>
+      el("button", { type: "button", class: feedFilter === f ? "sel" : "", onclick: () => { feedFilter = f; render(); } }, label)));
+    const refresh = el("button", { type: "button", class: "slim", onclick: async () => {
+      haptic("medium"); toast("Finding new picks…");
+      try { F = await api("POST", "/feed/refresh"); toast(F.added ? `Added ${F.added} new picks.` : "Nothing new right now."); render(); } catch (e) { toast(e.message); }
+    } }, "Refresh");
+    let items = F.items.slice();
+    if (feedFilter === "mine") items = items.filter(i => i.for_member === S.me);
+    else if (feedFilter === "saved") items = items.filter(i => (F.saves[i.id] || []).includes(S.me));
+    else items = items.filter(i => i.for_member === 0 || i.for_member === S.me || i.kind === "improve" || i.kind === "idea" || i.kind === "spark");
+    const spark = el("button", { type: "button", class: "slim go", onclick: async () => {
+      haptic("medium"); toast("Thinking up new ideas…");
+      try { F = await api("POST", "/feed/sparks"); toast(F.added ? `${F.added} fresh idea${F.added === 1 ? "" : "s"}.` : "No new ideas this time."); feedFilter = "all"; render(); } catch (e) { toast(e.message); }
+    } }, "New ideas");
+    const head = el("div", { class: "row", style: "justify-content:space-between" }, filters, el("div", { class: "row" }, spark, refresh));
+    const intro = !me().focus ? el("div", { class: "card" }, el("b", {}, "Tell the feed what you're working toward"), el("p", { class: "hint" }, "Add your focus in Setup (roles, stack, skills you want). Picks and project ideas are chosen for it."),
+      el("div", {}, el("button", { type: "button", onclick: () => setTab("setup") }, "Open Setup"))) : null;
+    if (!items.length) return [head, intro, el("div", { class: "card" }, el("b", {}, feedFilter === "saved" ? "Nothing saved yet" : "No picks yet"),
+      el("p", { class: "hint" }, feedFilter === "saved" ? "Tap Save on anything worth coming back to." : "The feed is built every morning. Tap Refresh to build it now."))];
+    // Notes and ideas first, then the daily picks grouped by day.
+    const today0 = me().date;
+    const sparks = items.filter(i => i.kind === "spark" && i.day === today0);
+    const pinned = items.filter(i => i.kind === "improve" || i.kind === "idea");
+    const daily = items.filter(i => i.kind !== "improve" && i.kind !== "idea" && !(i.kind === "spark" && i.day === today0));
+    const byDay = {};
+    for (const i of daily) (byDay[i.day] ||= []).push(i);
+    const today = me().date;
+    const dayLabel = d => d === today ? "Today" : new Date(d + "T12:00:00").toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" });
+    const out = [head, intro];
+    if (sparks.length) out.push(el("h2", { style: "font-size:20px" }, "Fresh ideas"), ...sparks.map(feedCard));
+    if (pinned.length) out.push(el("h2", { style: "font-size:20px" }, "This week"), ...pinned.slice(0, 8).map(feedCard));
+    for (const [d, list] of Object.entries(byDay)) out.push(el("h2", { style: "font-size:20px" }, dayLabel(d)), ...list.map(feedCard));
+    return out;
+  }
+
+  // ---- You: work, writing, resume ------------------------------------------
+  async function loadYou() {
+    try { Y = await api("GET", "/you"); } catch (e) { Y = { error: e.message }; }
+    if (tab === "you") render(); else updateYouBadge();
+  }
+  function updateYouBadge() { const b = $("#youBadge"); if (b && Y && Y.works) { const n = Y.works.filter(w => w.status === "doing").length; b.textContent = n ? String(n) : ""; } }
+  async function youAct(method, path, body, okMsg) {
+    try {
+      const r = await api(method, path, body);
+      Y = r.you || (r.works ? r : Y);
+      if (r.message || okMsg) toast(r.message || okMsg);
+      render(); return r;
+    } catch (e) { toast(e.message); }
+  }
+  async function feedDo(itemId, action) {
+    haptic("medium");
+    if (action === "write") toast("Writing drafts…");
+    try {
+      const r = await api("POST", `/feed/${itemId}/do`, { action });
+      Y = r.you; toast(r.message);
+      if (action === "todo") load();
+      updateYouBadge();
+    } catch (e) { toast(e.message); }
+  }
+  const STATE = { none: null, draft: ["Portfolio draft", "y"], live: ["On portfolio", "t"] };
+  function workCard(w) {
+    let links = {}; try { links = JSON.parse(w.links || "{}"); } catch {}
+    const st = STATE[w.portfolio_state];
+    const linked = !!(Y.portfolio && Y.portfolio.url);
+    const pBtn = !linked ? null
+      : w.portfolio_state === "none" ? el("button", { type: "button", class: "go", onclick: () => { toast("Writing the portfolio entry…"); youAct("POST", `/works/${w.id}/portfolio`); } }, "To portfolio")
+      : w.portfolio_state === "draft" ? el("button", { type: "button", class: "go", onclick: () => youAct("POST", `/works/${w.id}/publish`, { live: true }, "Published.") }, "Publish")
+      : el("button", { type: "button", onclick: () => youAct("POST", `/works/${w.id}/publish`, { live: false }, "Hidden again.") }, "Unpublish");
+    const edit = el("details", {}, el("summary", { class: "meta", style: "cursor:pointer" }, "Edit details"),
+      (() => {
+        const f = el("form", { style: "display:grid;gap:8px;margin-top:8px" },
+          el("label", { class: "field" }, el("span", {}, "Title"), el("input", { name: "title", value: w.title, maxlength: "160" })),
+          el("label", { class: "field" }, el("span", {}, "One-line summary"), el("input", { name: "summary", value: w.summary, maxlength: "400" })),
+          el("label", { class: "field" }, el("span", {}, "Details (Markdown)"), (() => { const t = el("textarea", { name: "details", rows: "5", maxlength: "4000" }); t.value = w.details; return t; })()),
+          el("label", { class: "field" }, el("span", {}, "Stack"), el("input", { name: "stack", value: w.stack, maxlength: "300", placeholder: "TypeScript, Next.js, Postgres" })),
+          el("div", { class: "goalrow" },
+            el("label", { class: "field" }, el("span", {}, "Live"), el("input", { name: "live", type: "url", value: links.live || "" })),
+            el("label", { class: "field" }, el("span", {}, "Code"), el("input", { name: "code", type: "url", value: links.code || "" })),
+            el("label", { class: "field" }, el("span", {}, "Post"), el("input", { name: "post", type: "url", value: links.post || "" }))),
+          el("div", { class: "row", style: "justify-content:space-between" },
+            el("button", { type: "button", onclick: () => youAct("DELETE", `/works/${w.id}`, null, "Deleted.") }, "Delete"),
+            el("button", { class: "primary", type: "submit" }, "Save")));
+        f.addEventListener("submit", e => { e.preventDefault(); const d = new FormData(f);
+          youAct("PATCH", `/works/${w.id}`, { title: d.get("title"), summary: d.get("summary"), details: d.get("details"), stack: d.get("stack"), links: { live: d.get("live"), code: d.get("code"), post: d.get("post") } }, "Saved."); });
+        return f;
+      })());
+    return el("div", { class: "card lead" + (w.status === "done" ? " done" : "") },
+      el("div", { class: "badges" }, el("span", { class: "bdg k" }, w.kind), el("span", { class: "bdg " + (w.status === "done" ? "t" : "y") }, w.status === "done" ? "Done" : "Doing"), st ? el("span", { class: "bdg " + st[1] }, st[0]) : null, w.in_resume ? el("span", { class: "bdg" }, "In resume") : null),
+      el("h3", {}, w.portfolio_url && safeUrl(w.portfolio_url) ? el("a", { href: w.portfolio_url, target: "_blank", rel: "noopener" }, w.title) : w.title),
+      w.summary ? el("p", {}, w.summary) : null,
+      w.stack ? el("div", { class: "meta" }, w.stack) : null,
+      el("div", { class: "dorow" },
+        el("button", { type: "button", onclick: () => youAct("POST", `/works/${w.id}/done`, { done: w.status !== "done" }) }, w.status === "done" ? "Reopen" : "Mark done"),
+        el("button", { type: "button", onclick: () => { toast("Writing drafts…"); youAct("POST", `/works/${w.id}/write`, {}); } }, "Write about it"),
+        pBtn,
+        el("label", { class: "row", style: "gap:6px;font:800 11px var(--mono);text-transform:uppercase" }, (() => { const c = el("input", { type: "checkbox", checked: !!w.in_resume }); c.addEventListener("change", () => youAct("PATCH", `/works/${w.id}`, { in_resume: c.checked })); return c; })(), "Resume")),
+      edit);
+  }
+  function viewWork() {
+    const add = el("details", { class: "card" }, el("summary", {}, "Log something"),
+      (() => {
+        const f = el("form", { style: "display:grid;gap:10px;margin-top:10px" },
+          el("div", { class: "goalrow", style: "grid-template-columns:1fr 2fr" },
+            el("label", { class: "field" }, el("span", {}, "Kind"), el("select", { name: "kind" }, el("option", { value: "project" }, "Project"), el("option", { value: "post" }, "Post / talk"), el("option", { value: "skill" }, "Skill"))),
+            el("label", { class: "field" }, el("span", {}, "Title"), el("input", { name: "title", required: true, maxlength: "160", placeholder: "Ticket triage agent" }))),
+          el("label", { class: "field" }, el("span", {}, "What it is, roughly"), el("input", { name: "summary", maxlength: "400", placeholder: "Sorts support tickets by urgency with Gemini" })),
+          el("label", { class: "field" }, el("span", {}, "Stack"), el("input", { name: "stack", maxlength: "300", placeholder: "TypeScript, Next.js, Gemini" })),
+          el("div", { class: "goalrow", style: "grid-template-columns:1fr 1fr" },
+            el("label", { class: "field" }, el("span", {}, "Live link"), el("input", { name: "live", type: "url" })),
+            el("label", { class: "field" }, el("span", {}, "Code link"), el("input", { name: "code", type: "url" }))),
+          el("div", { class: "row", style: "justify-content:flex-end" }, el("button", { class: "primary", type: "submit" }, "Add")));
+        f.addEventListener("submit", e => { e.preventDefault(); const d = new FormData(f);
+          youAct("POST", "/works", { kind: d.get("kind"), title: d.get("title"), summary: d.get("summary"), stack: d.get("stack"), links: { live: d.get("live"), code: d.get("code") } }, "Added."); });
+        return f;
+      })());
+    const hint = !(Y.portfolio && Y.portfolio.url) ? el("div", { class: "card" }, el("b", {}, "Link your portfolio to publish work"), el("p", { class: "hint" }, "Add your portfolio's API address and key in Setup. Then each item gets To portfolio → Publish."), el("div", {}, el("button", { type: "button", onclick: () => setTab("setup") }, "Open Setup"))) : null;
+    const list = Y.works.length ? Y.works.map(workCard) : [el("p", { class: "hint" }, "Nothing logged yet. Tap Do it on a feed card, send /built to the bot, or log something above.")];
+    return [add, hint, ...list];
+  }
+  const PLAT = { linkedin: ["LinkedIn", "t"], x: ["X", "k"], devto: ["dev.to", "y"] };
+  function viewWriting() {
+    if (!Y.drafts.length) return [el("div", { class: "card" }, el("b", {}, "No drafts yet"), el("p", { class: "hint" }, "Tap Write about it on a feed card or on your work. You get a LinkedIn post, an X thread and a dev.to outline to edit and post."))];
+    return Y.drafts.map(d => {
+      const [label, tone] = PLAT[d.platform] || [d.platform, ""];
+      return el("div", { class: "card" },
+        el("div", { class: "row", style: "justify-content:space-between" }, el("span", { class: "bdg " + tone }, label), el("span", { class: "meta" }, new Date(d.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" }))),
+        el("pre", { class: "post" }, d.body),
+        el("div", { class: "row", style: "justify-content:space-between" },
+          el("button", { type: "button", onclick: () => youAct("DELETE", `/drafts/${d.id}`, null, "Deleted.") }, "Delete"),
+          el("button", { type: "button", class: "primary", onclick: async () => { try { await navigator.clipboard.writeText(d.body); toast("Copied."); } catch { toast("Couldn't copy. Long-press the text to copy it."); } } }, "Copy")));
+    });
+  }
+  // Profile <-> plain-text blocks, so it's quick to edit on a phone.
+  const expToText = xs => (xs || []).map(e => [[e.title, e.org, e.when].filter(Boolean).join(" | "), ...(e.bullets || []).map(b => "- " + b), ...(e.summary && !(e.bullets || []).length ? [e.summary] : [])].join("\n")).join("\n\n");
+  const textToExp = t => t.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean).map(b => { const [head, ...rest] = b.split("\n"); const [title = "", org = "", when = ""] = head.split("|").map(x => x.trim()); const bullets = rest.filter(l => /^\s*[-•]/.test(l)).map(l => l.replace(/^\s*[-•]\s*/, "")); const summary = rest.filter(l => !/^\s*[-•]/.test(l)).join(" "); return { title, org, when, bullets, summary }; });
+  const eduToText = xs => (xs || []).map(e => [e.title, e.org, e.when].filter(Boolean).join(" | ")).join("\n");
+  const textToEdu = t => t.split("\n").map(l => l.trim()).filter(Boolean).map(l => { const [title = "", org = "", when = ""] = l.split("|").map(x => x.trim()); return { title, org, when }; });
+  const skillsToText = xs => (xs || []).map(g => `${g.group}: ${(g.items || []).join(", ")}`).join("\n");
+  const textToSkills = t => t.split("\n").map(l => l.trim()).filter(Boolean).map(l => { const i = l.indexOf(":"); return i > 0 ? { group: l.slice(0, i).trim(), items: l.slice(i + 1).split(",").map(x => x.trim()).filter(Boolean) } : { group: "Skills", items: l.split(",").map(x => x.trim()).filter(Boolean) }; });
+  const linksToText = xs => (xs || []).map(l => `${l.label} ${l.url}`).join("\n");
+  const textToLinks = t => t.split("\n").map(l => l.trim()).filter(Boolean).map(l => { const m = l.match(/^(.*?)\s*(https?:\/\/\S+)$/); return m ? { label: m[1] || "Link", url: m[2] } : null; }).filter(Boolean);
+  function resumePaper(r) {
+    const ct = [r.location, r.email, r.website, ...(r.links || []).map(l => l.url)].filter(Boolean).join(" · ");
+    const ln = (l, rt) => el("div", { class: "ln" }, el("div", {}, l), rt ? el("span", {}, rt) : null);
+    const ul = xs => (xs && xs.length) ? el("ul", {}, xs.map(b => el("li", {}, b))) : null;
+    return el("div", { class: "paper" },
+      el("h3", {}, r.name || ""), r.headline ? el("div", { class: "hl" }, r.headline) : null, ct ? el("div", { class: "ct" }, ct) : null,
+      r.summary ? [el("h4", {}, "Summary"), el("div", {}, r.summary)] : null,
+      (r.experience || []).length ? [el("h4", {}, "Experience"), r.experience.map(e => [ln([e.title, e.org].filter(Boolean).join(" — "), e.when), ul(e.bullets)])] : null,
+      (r.projects || []).length ? [el("h4", {}, "Projects"), r.projects.map(p => [ln(p.title, p.when), p.summary ? el("div", { style: "font-style:italic" }, p.summary) : null, ul(p.bullets), (p.stack || p.link) ? el("div", { class: "mt" }, [p.stack, p.link].filter(Boolean).join(" · ")) : null])] : null,
+      (r.skills || []).length ? [el("h4", {}, "Skills"), r.skills.map(g => el("div", {}, el("b", {}, g.group + ": "), (g.items || []).join(", ")))] : null,
+      (r.education || []).length ? [el("h4", {}, "Education"), r.education.map(e => ln([e.title, e.org].filter(Boolean).join(" — "), e.when))] : null);
+  }
+  async function download(ext) {
+    try {
+      const l = await api("GET", "/resume/links");
+      const url = l[ext], name = `Resume.${ext}`;
+      if (tg && tg.downloadFile) tg.downloadFile({ url, file_name: name });
+      else if (tg) tg.openLink(url);
+      else window.open(url, "_blank");
+    } catch (e) { toast(e.message); }
+  }
+  function viewResume() {
+    const p = Y.profile, linked = !!(Y.portfolio && Y.portfolio.url);
+    const ta = (name, value, rows, ph) => { const t = el("textarea", { name, rows: String(rows), placeholder: ph }); t.value = value || ""; return t; };
+    const prof = el("details", { class: "card", open: !p.name }, el("summary", {}, "Profile"),
+      (() => {
+        const f = el("form", { style: "display:grid;gap:10px;margin-top:10px" },
+          linked ? el("button", { type: "button", onclick: () => youAct("POST", "/profile/import", null, "Imported from your portfolio.") }, "Import from my portfolio") : null,
+          el("div", { class: "goalrow", style: "grid-template-columns:1fr 1fr" },
+            el("label", { class: "field" }, el("span", {}, "Name"), el("input", { name: "name", value: p.name })),
+            el("label", { class: "field" }, el("span", {}, "Location"), el("input", { name: "location", value: p.location, placeholder: "Addis Ababa · Remote" }))),
+          el("label", { class: "field" }, el("span", {}, "Headline"), el("input", { name: "headline", value: p.headline, placeholder: "Full-stack AI engineer" })),
+          el("div", { class: "goalrow", style: "grid-template-columns:1fr 1fr" },
+            el("label", { class: "field" }, el("span", {}, "Email"), el("input", { name: "email", type: "email", value: p.email })),
+            el("label", { class: "field" }, el("span", {}, "Website"), el("input", { name: "website", type: "url", value: p.website }))),
+          el("label", { class: "field" }, el("span", {}, "Links (one per line: label + url)"), ta("links", linksToText(p.links), 2, "GitHub https://github.com/you")),
+          el("label", { class: "field" }, el("span", {}, "Summary"), ta("summary", p.summary, 3, "")),
+          el("label", { class: "field" }, el("span", {}, "Experience (Title | Org | When, then - bullets; blank line between jobs)"), ta("experience", expToText(p.experience), 7, "Frontend Developer | Acme | 2024 – 2025\n- Built the checkout in React\n- Cut page load by half")),
+          el("label", { class: "field" }, el("span", {}, "Education (Title | Org | When)"), ta("education", eduToText(p.education), 2, "BSc Computer Science | AAU | 2023")),
+          el("label", { class: "field" }, el("span", {}, "Skills (Group: a, b, c)"), ta("skills", skillsToText(p.skills), 3, "Languages: TypeScript, Python\nFrameworks: React, Next.js")),
+          el("div", { class: "row", style: "justify-content:flex-end" }, el("button", { class: "primary", type: "submit" }, "Save profile")));
+        f.addEventListener("submit", e => { e.preventDefault(); const d = new FormData(f);
+          youAct("PUT", "/profile", { profile: { name: d.get("name"), headline: d.get("headline"), location: d.get("location"), email: d.get("email"), website: d.get("website"),
+            links: textToLinks(d.get("links")), summary: d.get("summary"), experience: textToExp(d.get("experience")), education: textToEdu(d.get("education")), skills: textToSkills(d.get("skills")) } }, "Profile saved."); });
+        return f;
+      })());
+    const picked = Y.works.filter(w => w.in_resume).length;
+    const gen = el("form", { class: "card" }, el("h2", {}, "Generate"),
+      el("p", { class: "hint" }, `Uses your profile and the ${picked} work item${picked === 1 ? "" : "s"} you ticked for the resume.`),
+      el("label", { class: "field" }, el("span", {}, "Aim it at (optional)"), el("input", { id: "r-target", value: Y.resume ? Y.resume.target : "", placeholder: "Forward Deployed AI Engineer, remote" })),
+      el("div", { class: "row", style: "justify-content:flex-end" }, el("button", { class: "primary", type: "submit", disabled: !Y.ai }, Y.resume ? "Regenerate" : "Generate")));
+    gen.addEventListener("submit", e => { e.preventDefault(); toast("Writing your resume…"); youAct("POST", "/resume/generate", { target: $("#r-target").value.trim() }, "Resume ready."); });
+    const out = [prof, gen];
+    if (Y.resume) {
+      out.push(el("div", { class: "card" },
+        el("div", { class: "row", style: "justify-content:space-between" }, el("h2", {}, "Your resume"), el("span", { class: "meta" }, `Made ${new Date(Y.resume.generatedAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}${Y.resume.publishedAt ? " · on portfolio" : ""}`)),
+        el("div", { class: "dorow" },
+          el("button", { type: "button", class: "go", onclick: () => download("pdf") }, "PDF"),
+          el("button", { type: "button", onclick: () => download("docx") }, "Word"),
+          el("button", { type: "button", onclick: () => youAct("POST", "/resume/send") }, "Send to chat"),
+          linked ? el("button", { type: "button", onclick: () => youAct("POST", "/resume/publish") }, "Put on portfolio") : null)),
+        resumePaper(Y.resume.data));
+    }
+    return out;
+  }
+  function viewYou() {
+    if (!Y) { loadYou(); return [el("p", { class: "hint" }, "Loading…")]; }
+    if (Y.error) return [el("div", { class: "card" }, el("b", {}, "This didn't load"), el("p", { class: "hint" }, Y.error))];
+    const seg = el("div", { class: "seg" }, [["work", "Work"], ["writing", "Writing"], ["resume", "Resume"]].map(([k, label]) =>
+      el("button", { type: "button", class: youSeg === k ? "on" : "", onclick: () => { youSeg = k; render(); } }, label)));
+    const ai = !Y.ai ? el("p", { class: "hint" }, "No AI key on the server yet, so writing drafts and the resume generator are off.") : null;
+    return [seg, ai, ...({ work: viewWork, writing: viewWriting, resume: viewResume }[youSeg] || viewWork)()];
+  }
+
   // ---- Setup ---------------------------------------------------------------
   function viewSetup() {
     const m = me(), s = S.session;
     const goals = el("form", { class: "card" }, el("h2", {}, "My daily minimums"),
       el("div", { class: "goalrow" }, COUNTS.map(([k, label]) => el("label", { class: "field" }, el("span", {}, label), el("input", { id: "g-" + k, type: "number", min: "0", max: "50", value: String(m.goals[k]) })))),
       el("label", { class: "field" }, el("span", {}, "My time zone"), el("input", { id: "g-tz", value: m.tz, placeholder: "Asia/Shanghai" })),
+      el("label", { class: "field" }, el("span", {}, "What I'm working toward (the feed uses this)"), (() => { const t = el("textarea", { id: "g-focus", maxlength: "500", rows: "3", placeholder: "Frontend roles, React + TypeScript. Want more backend and testing skills." }); t.value = m.focus || ""; return t; })()),
       el("div", { class: "row", style: "justify-content:flex-end" }, el("button", { class: "primary", type: "submit" }, "Save")));
     goals.addEventListener("submit", async e => {
       e.preventDefault();
-      const body = { goals: Object.fromEntries(COUNTS.map(([k]) => [k, Number($("#g-" + k).value) || 0])), tz: $("#g-tz").value.trim() };
+      const body = { goals: Object.fromEntries(COUNTS.map(([k]) => [k, Number($("#g-" + k).value) || 0])), tz: $("#g-tz").value.trim(), focus: $("#g-focus").value.trim() };
       if (await act("POST", "/me", body)) toast("Saved.");
     });
     const sess = el("form", { class: "card" }, el("h2", {}, "Live sessions"),
@@ -365,10 +691,21 @@ a{color:inherit}
     });
     const rules = el("div", { class: "card" }, el("h2", {}, "The deal"), el("ol", { class: "deal" },
       ["Clock in with today's plan before you start.", "Hit your daily minimums and log them as they happen.", "Any role that fits the other person goes in Leads.", "Clock out with what got done and anything blocking you.", "Sunday: look at the Week tab together and adjust goals.", "Missed a day? Say so in your card and pick it back up tomorrow."].map(t => el("li", {}, t))));
-    return [goals, sess, rules];
+    const linked = Y && Y.portfolio && Y.portfolio.url;
+    const port = el("form", { class: "card" }, el("h2", {}, "My portfolio API"),
+      el("p", { class: "hint" }, linked ? `Linked: ${Y.portfolio.url}` : "Your portfolio's /api/abro address and key. Abro adds work as drafts and publishes when you say so."),
+      el("label", { class: "field" }, el("span", {}, "API address"), el("input", { id: "p-url", type: "url", value: linked || "", placeholder: "https://your-site.vercel.app/api/abro" })),
+      el("label", { class: "field" }, el("span", {}, "Key"), el("input", { id: "p-key", type: "password", autocomplete: "off", placeholder: linked ? "Saved. Enter a new one to change it." : "The key your site expects" })),
+      el("div", { class: "row", style: "justify-content:space-between" },
+        linked ? el("button", { type: "button", onclick: () => youAct("DELETE", "/portfolio", null, "Unlinked.") }, "Unlink") : el("span"),
+        el("button", { class: "primary", type: "submit" }, "Save and test")));
+    port.addEventListener("submit", e => { e.preventDefault(); toast("Testing the link…"); youAct("PUT", "/portfolio", { url: $("#p-url").value.trim(), key: $("#p-key").value.trim() }); });
+    if (!Y) loadYou();
+    return [goals, port, sess, rules];
   }
 
-  load();
+  load().then(loadFeed).then(loadYou);
+  setInterval(() => { if (!document.hidden && tab !== "feed") loadFeed(); }, 5 * 60_000);
   setInterval(() => { if (!document.hidden && !(document.activeElement && /^(t-|todoText|l|g-|s-)/.test(document.activeElement.id || ""))) load(); }, 20000);
   setInterval(tickClock, 20000);
 })();
