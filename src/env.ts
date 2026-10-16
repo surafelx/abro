@@ -4,7 +4,8 @@ export const env = {
   token: process.env.BOT_TOKEN ?? "",
   adminId: Number(process.env.ADMIN_USER_ID || 0),
   port: Number(process.env.PORT || 8787),
-  publicUrl: (process.env.PUBLIC_URL ?? "").replace(/\/+$/, ""),
+  // Render sets RENDER_EXTERNAL_URL itself, so PUBLIC_URL can stay empty there.
+  publicUrl: (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || "").replace(/\/+$/, ""),
   databaseUrl: process.env.DATABASE_URL ?? "",
   apleoUrl: (process.env.APLEO_API_URL ?? "").replace(/\/+$/, ""),
   apleoKey: process.env.APLEO_API_KEY ?? "",

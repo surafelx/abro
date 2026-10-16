@@ -1,0 +1,40 @@
+# Render Blueprint: New → Blueprint → pick this repo. Free plan; the service sleeps when idle,
+# so the bot runs on webhooks and a free scheduler (cron-job.org) calls /tick every 10 minutes.
+services:
+  - type: web
+    name: abro
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22.20.0"
+      - key: BOT_MODE
+        value: webhook
+      - key: WEBHOOK_SECRET
+        generateValue: true
+      - key: CRON_KEY
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: DEFAULT_TZ
+        value: Africa/Addis_Ababa
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      # Fill these in when Render asks:
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_USER_ID
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: APLEO_API_URL
+        sync: false
+      - key: APLEO_API_KEY
+        sync: false
