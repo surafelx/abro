@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Abro</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,600..800&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: a shift board for a phone. Sticky tab bar; each tab is one job (today's card, todos, leads, week, setup).
+   Colors follow the Telegram theme when opened inside Telegram; the fallbacks are Abro's own palette. */
+:root{
+  --bg:var(--tg-theme-secondary-bg-color,#E9EEEA);
+  --surface:var(--tg-theme-section-bg-color,var(--tg-theme-bg-color,#FBFCFB));
+  --ink:var(--tg-theme-text-color,#18211E);
+  --muted:var(--tg-theme-hint-color,#5A6862);
+  --accent:var(--tg-theme-button-color,#1E58B8);
+  --accent-ink:var(--tg-theme-button-text-color,#FFFFFF);
+  --line:color-mix(in srgb,var(--muted) 30%,transparent);
+  --stamp:#B8430F; --good:#1F7A4D;
+  --display:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:var(--tg-theme-secondary-bg-color,#101614);
+  --surface:var(--tg-theme-section-bg-color,var(--tg-theme-bg-color,#18201D));
+  --ink:var(--tg-theme-text-color,#E4EBE7);
+  --muted:var(--tg-theme-hint-color,#93A39C);
+  --accent:var(--tg-theme-button-color,#7FA9F2);
+  --accent-ink:var(--tg-theme-button-text-color,#0E1A2E);
+  --stamp:#F0905F; --good:#5FCB93; color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);-webkit-font-smoothing:antialiased}
+.top{position:sticky;top:0;z-index:5;background:var(--bg);padding:12px max(14px,env(safe-area-inset-left)) 0 max(14px,env(safe-area-inset-right));border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.brand h1{margin:0;font:800 30px/1 var(--display);font-stretch:75%}
+.brand span{font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+nav{display:flex;gap:2px;overflow-x:auto;margin-top:10px;scrollbar-width:none}
+nav button{flex:1;border:0;background:none;color:var(--muted);font:600 14px var(--body);padding:8px 10px 10px;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap}
+nav button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+nav .badge{font:700 11px var(--mono);color:var(--accent);margin-left:4px}
+main{padding:14px max(14px,env(safe-area-inset-left)) 40px max(14px,env(safe-area-inset-right));display:grid;gap:14px;max-width:720px;margin:0 auto}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:12px;min-width:0}
+.card.me{border-color:var(--accent)}
+.who{display:flex;align-items:center;gap:8px}
+.who b{font:700 18px var(--display);font-stretch:90%}
+.who .tag{margin-left:auto;font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.punch{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font:500 12px var(--mono);color:var(--muted)}
+.punch span{border:1px solid var(--line);padding:3px 8px;border-radius:4px}
+.punch span.on{color:var(--stamp);border-color:var(--stamp)}
+.counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.count{border:1px solid var(--line);border-radius:8px;padding:8px;display:grid;gap:4px;min-width:0}
+.count label{font:500 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+.count .n{font:700 24px var(--mono);font-variant-numeric:tabular-nums}
+.count .n small{font-size:13px;color:var(--muted);font-weight:500}
+.count.hit{border-color:var(--good)} .count.hit .n{color:var(--good)}
+.step{display:flex;gap:6px}
+button{font:600 14px var(--body);border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 12px;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.stampbtn{border-color:var(--stamp);color:var(--stamp);font:700 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:5px 10px}
+.step button{flex:1;padding:6px 0;font:700 17px var(--mono)}
+.field{display:grid;gap:4px;min-width:0}
+.field>span{font:500 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+textarea,input,select{font:15px/1.45 var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-width:0}
+textarea{resize:vertical;min-height:56px}
+.ro p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.empty{color:var(--muted);font-style:italic}
+h2{margin:0;font:700 20px/1.2 var(--display);font-stretch:85%}
+.hint{color:var(--muted);font-size:13px;margin:0}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+.todo{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}
+.todo:last-child{border-bottom:0}
+.todo .box{flex:none;width:22px;height:22px;border-radius:6px;border:1.5px solid var(--muted);display:grid;place-items:center;padding:0;background:none;font:700 13px var(--mono);color:var(--surface)}
+.todo.done .box{background:var(--good);border-color:var(--good)}
+.todo.done .txt{text-decoration:line-through;color:var(--muted)}
+.todo .txt{flex:1;min-width:0;overflow-wrap:anywhere}
+.todo .meta{font:500 11px var(--mono);color:var(--muted)}
+.todo .x{border:0;background:none;color:var(--muted);padding:0 4px;font-size:18px;line-height:1}
+.todo.ro .box{border-style:dashed;cursor:default}
+.lead{border-left:4px solid var(--accent)}
+.lead.done{border-left-color:var(--good)} .lead.skip{opacity:.7;border-left-color:var(--line)}
+.lead h3{margin:0;font:700 17px/1.3 var(--display);font-stretch:90%;overflow-wrap:anywhere}
+.lead h3 a{color:inherit}
+.lead .meta{font:500 12px var(--mono);color:var(--muted)}
+.lead p{margin:0;overflow-wrap:anywhere}
+.lead .row button{font-size:13px;padding:6px 10px}
+.sel{background:var(--ink)!important;color:var(--surface)!important;border-color:var(--ink)!important}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.filters button{font-size:13px;padding:5px 10px}
+.gridwrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:420px}
+th,td{padding:8px 4px;text-align:center;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+th{font:500 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+td.name{text-align:left;font-weight:600;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+.hole{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;border:1.5px dashed var(--line);font:700 11px var(--mono);color:var(--muted)}
+.hole.part{border-style:solid;border-color:var(--muted);color:var(--ink)}
+.hole.full{background:var(--good);border-color:var(--good);color:var(--surface)}
+.tot{font:700 13px var(--mono);text-align:right;white-space:nowrap}
+@media (max-width:480px){
+  table{min-width:0}
+  th,td{padding:6px 1px}
+  .hole{width:24px;height:24px;font-size:10px}
+  td.name{max-width:64px;overflow:hidden;text-overflow:ellipsis;font-size:13px}
+  .tot{font-size:11px}
+}
+.goalrow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.days{display:flex;flex-wrap:wrap;gap:6px}
+.days label{display:flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:6px;padding:4px 8px;font:500 12px var(--mono);cursor:pointer}
+.days input{width:auto}
+.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:8px 14px;border-radius:8px;font-size:14px;max-width:calc(100% - 32px)}
+.gate{padding:40px 20px;text-align:center;display:grid;gap:10px;justify-items:center}
+a{color:var(--accent)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="brand"><h1>Abro</h1><span id="clockNow"></span></div>
+  <nav role="tablist" id="tabs">
+    <button role="tab" data-tab="today" aria-selected="true">Today</button>
+    <button role="tab" data-tab="todos">Todos<span class="badge" id="todoBadge"></span></button>
+    <button role="tab" data-tab="leads">Leads<span class="badge" id="leadBadge"></span></button>
+    <button role="tab" data-tab="week">Week</button>
+    <button role="tab" data-tab="setup">Setup</button>
+  </nav>
+</div>
+<main id="main"><div class="gate"><p class="hint">Loading the board…</p></div></main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+  const tg = window.Telegram && window.Telegram.WebApp;
+  if (tg) { tg.ready(); tg.expand(); }
+  const initData = tg ? tg.initData : "";
+
+  const $ = s => document.querySelector(s);
+  const el = (tag, props = {}, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(props)) { if (k === "class") e.className = v; else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else if (v != null && v !== false) e.setAttribute(k, v === true ? "" : v); } for (const c of kids.flat()) if (c != null && c !== false) e.append(c); return e; };
+  const pad = n => String(n).padStart(2, "0");
+  const COUNTS = [["apps", "Applications"], ["outreach", "Outreach"], ["commits", "Commits"]];
+  const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const safeUrl = u => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : null; } catch { return null; } };
+
+  let S = null, tab = "today", leadFilter = "open", busy = false;
+  try { tab = sessionStorage.getItem("abro-tab") || "today"; } catch {}
+
+  function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 2200); }
+  function haptic(kind = "light") { try { tg && tg.HapticFeedback.impactOccurred(kind); } catch {} }
+
+  async function api(method, path, body) {
+    const r = await fetch("/api" + path, { method, headers: { "content-type": "application/json", ...(initData ? { authorization: "tma " + initData } : {}) }, body: body ? JSON.stringify(body) : undefined });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw Object.assign(new Error(data.error || "Couldn't reach the server."), { status: r.status });
+    return data;
+  }
+  async function act(method, path, body) {
+    try { const data = await api(method, path, body); if (data && data.members) { S = data; render(); } return data; }
+    catch (e) { toast(e.message); }
+  }
+  async function load() {
+    try { S = await api("GET", "/state"); render(); }
+    catch (e) { $("#main").replaceChildren(el("div", { class: "gate" }, el("h2", {}, e.status === 403 ? "Not on the team yet" : "Open Abro from Telegram"), el("p", { class: "hint" }, e.message))); }
+  }
+
+  const me = () => S.members.find(m => m.id === S.me);
+  const byId = id => S.members.find(m => m.id === id);
+  const nameOf = id => id === S.me ? "You" : (byId(id) ? byId(id).name : "Someone");
+  const hm = (iso, tz) => iso ? new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(iso)) : "--:--";
+  const hitAll = (m, d) => !!d && COUNTS.every(([k]) => d[k] >= m.goals[k]);
+
+  function setTab(t) { tab = t; try { sessionStorage.setItem("abro-tab", t); } catch {} render(); window.scrollTo(0, 0); }
+  $("#tabs").addEventListener("click", e => { const b = e.target.closest("button[data-tab]"); if (b) setTab(b.dataset.tab); });
+
+  function tickClock() { if (!S) return; const m = me(); $("#clockNow").textContent = `${new Intl.DateTimeFormat(undefined, { timeZone: m.tz, weekday: "short", day: "numeric", month: "short" }).format(new Date())} · ${hm(new Date().toISOString(), m.tz)}`; }
+
+  function render() {
+    for (const b of $("#tabs").children) b.setAttribute("aria-selected", String(b.dataset.tab === tab));
+    const myOpen = S.todos.filter(t => !t.done_at && (t.owner === S.me || t.owner === 0)).length;
+    $("#todoBadge").textContent = myOpen ? String(myOpen) : "";
+    const openLeads = S.leads.filter(l => !l.status[S.me] && (l.for_who === 0 || l.for_who === S.me) && l.by !== S.me).length;
+    $("#leadBadge").textContent = openLeads ? String(openLeads) : "";
+    tickClock();
+    const view = { today: viewToday, todos: viewTodos, leads: viewLeads, week: viewWeek, setup: viewSetup }[tab] || viewToday;
+    const focused = document.activeElement && document.activeElement.id;
+    $("#main").replaceChildren(...[].concat(view()));
+    if (focused) { const f = document.getElementById(focused); if (f) f.focus(); }
+  }
+
+  // ---- Today ---------------------------------------------------------------
+  const textTimers = {};
+  function viewToday() {
+    const out = [myCard()];
+    for (const m of S.members) if (m.id !== S.me) out.push(partnerCard(m));
+    if (S.members.length < 2) out.push(el("div", { class: "card" }, el("b", {}, "Waiting for your partner"), el("p", { class: "hint" }, `They message @${S.bot || "the bot"} and you approve them. Their card shows up here.`)));
+    return out;
+  }
+  function counts(m, d, editable) {
+    return el("div", { class: "counts" }, COUNTS.map(([k, label]) => {
+      const v = d[k] || 0, g = m.goals[k];
+      return el("div", { class: "count" + (v >= g && g > 0 ? " hit" : "") },
+        el("label", {}, label), el("div", { class: "n" }, String(v), el("small", {}, ` / ${g}`)),
+        editable && el("div", { class: "step" },
+          el("button", { type: "button", "aria-label": `One less ${label}`, onclick: () => { haptic(); act("POST", "/day/count", { key: k, delta: -1 }); } }, "−"),
+          el("button", { type: "button", "aria-label": `One more ${label}`, onclick: () => { haptic(); act("POST", "/day/count", { key: k, delta: 1 }); } }, "+")));
+    }));
+  }
+  function myCard() {
+    const m = me(), d = m.today;
+    const punch = el("div", { class: "punch" }, el("span", { class: d.in_at ? "on" : "" }, `IN ${hm(d.in_at, m.tz)}`), el("span", { class: d.out_at ? "on" : "" }, `OUT ${hm(d.out_at, m.tz)}`));
+    if (!d.in_at) punch.append(el("button", { class: "stampbtn", type: "button", onclick: () => { haptic("medium"); act("POST", "/day/clock", { action: "in" }); } }, "Clock in"));
+    else if (!d.out_at) punch.append(el("button", { class: "stampbtn", type: "button", onclick: () => { haptic("medium"); act("POST", "/day/clock", { action: "out" }); } }, "Clock out"));
+    const card = el("div", { class: "card me" }, el("div", { class: "who" }, el("b", {}, m.name), el("span", { class: "tag" }, "you · today")), punch, counts(m, d, true));
+    for (const [k, label, ph] of [["plan", "Today's plan", "5 applications, finish the README, 1 cold email"], ["done", "What got done", "Fill in at clock-out"], ["blocker", "Blocked on", "Anything you need from your partner"]]) {
+      const ta = el("textarea", { id: "t-" + k, maxlength: "2000", rows: k === "plan" ? "3" : "2", placeholder: ph });
+      ta.value = d[k] || "";
+      ta.addEventListener("input", () => { d[k] = ta.value; clearTimeout(textTimers[k]); textTimers[k] = setTimeout(() => api("POST", "/day/text", { key: k, text: ta.value }).catch(e => toast(e.message)), 600); });
+      card.append(el("label", { class: "field" }, el("span", {}, label), ta));
+    }
+    return card;
+  }
+  function partnerCard(m) {
+    const d = m.today;
+    const card = el("div", { class: "card" },
+      el("div", { class: "who" }, el("b", {}, m.name), el("span", { class: "tag" }, `partner · ${hm(new Date().toISOString(), m.tz)} there`)),
+      el("div", { class: "punch" }, el("span", { class: d.in_at ? "on" : "" }, `IN ${hm(d.in_at, m.tz)}`), el("span", { class: d.out_at ? "on" : "" }, `OUT ${hm(d.out_at, m.tz)}`)),
+      counts(m, d, false));
+    for (const [k, label] of [["plan", "Today's plan"], ["done", "What got done"], ["blocker", "Blocked on"]])
+      card.append(el("div", { class: "field ro" }, el("span", {}, label), d[k] ? el("p", {}, d[k]) : el("p", { class: "empty" }, k === "plan" ? "Not clocked in yet." : "Nothing yet.")));
+    return card;
+  }
+
+  // ---- Todos ---------------------------------------------------------------
+  function viewTodos() {
+    const form = el("form", { class: "card" },
+      el("label", { class: "field" }, el("span", {}, "New todo"), el("input", { id: "todoText", maxlength: "300", placeholder: "Rewrite the portfolio intro", required: true })),
+      el("div", { class: "row" },
+        el("label", { class: "row grow", style: "gap:6px;font-size:14px" }, el("input", { id: "todoShared", type: "checkbox", style: "width:auto" }), "Shared with partner"),
+        el("button", { class: "primary", type: "submit" }, "Add")));
+    form.addEventListener("submit", async e => {
+      e.preventDefault(); const text = $("#todoText").value.trim(); if (!text) return;
+      const shared = $("#todoShared").checked; $("#todoText").value = "";
+      haptic(); await act("POST", "/todos", { text, shared });
+    });
+    const group = (title, list, editable) => el("div", { class: "card" }, el("h2", {}, title),
+      list.length ? el("div", {}, list.map(t => todoRow(t, editable))) : el("p", { class: "hint" }, "Nothing here."));
+    const mine = S.todos.filter(t => t.owner === S.me), shared = S.todos.filter(t => t.owner === 0);
+    const out = [form, group("Yours", mine, true), group("Shared", shared, true)];
+    for (const m of S.members) if (m.id !== S.me) out.push(group(m.name, S.todos.filter(t => t.owner === m.id), false));
+    return out;
+  }
+  function todoRow(t, editable) {
+    const done = !!t.done_at;
+    const row = el("div", { class: "todo" + (done ? " done" : "") + (editable ? "" : " ro") },
+      el("button", { class: "box", type: "button", "aria-label": done ? "Mark not done" : "Mark done", disabled: !editable, onclick: () => { haptic(); act("POST", `/todos/${t.id}/toggle`); } }, done ? "✓" : ""),
+      el("div", { class: "txt" }, t.text, el("div", { class: "meta" }, `#${t.id}${t.owner === 0 ? ` · added by ${nameOf(t.created_by)}` : ""}${done ? ` · done by ${nameOf(t.done_by)}` : ""}`)));
+    if (t.created_by === S.me) row.append(el("button", { class: "x", type: "button", "aria-label": "Delete todo", onclick: () => act("DELETE", `/todos/${t.id}`) }, "×"));
+    return row;
+  }
+
+  // ---- Leads ---------------------------------------------------------------
+  function viewLeads() {
+    const others = S.members.filter(m => m.id !== S.me);
+    const form = el("form", { class: "card" },
+      el("h2", {}, "Share a lead"),
+      el("label", { class: "field" }, el("span", {}, "Role"), el("input", { id: "lTitle", maxlength: "160", required: true, placeholder: "Frontend Developer" })),
+      el("label", { class: "field" }, el("span", {}, "Company"), el("input", { id: "lCompany", maxlength: "100", placeholder: "Acme" })),
+      el("label", { class: "field" }, el("span", {}, "Link"), el("input", { id: "lUrl", type: "url", maxlength: "600", placeholder: "https://…" })),
+      el("label", { class: "field" }, el("span", {}, "Who it's for"), el("select", { id: "lFor" }, el("option", { value: "0" }, "Both of us"), el("option", { value: String(S.me) }, "Me"), others.map(m => el("option", { value: String(m.id) }, m.name)))),
+      el("label", { class: "field" }, el("span", {}, "Why it fits"), el("input", { id: "lNote", maxlength: "400", placeholder: "Remote, open worldwide, React + Node" })),
+      el("div", { class: "row", style: "justify-content:flex-end" }, el("button", { class: "primary", type: "submit" }, "Share lead")));
+    form.addEventListener("submit", async e => {
+      e.preventDefault();
+      const url = $("#lUrl").value.trim();
+      if (url && !safeUrl(url)) return toast("Links need to start with https://");
+      const body = { title: $("#lTitle").value.trim(), company: $("#lCompany").value.trim(), url, note: $("#lNote").value.trim(), forWho: Number($("#lFor").value) };
+      if (!body.title) return;
+      haptic(); if (await act("POST", "/leads", body)) toast("Shared with your partner.");
+    });
+    const filters = el("div", { class: "filters" }, [["open", "Open"], ["mine", "For me"], ["all", "All"]].map(([f, label]) =>
+      el("button", { type: "button", class: leadFilter === f ? "sel" : "", onclick: () => { leadFilter = f; render(); } }, label)));
+    const my = l => l.status[S.me];
+    let list = S.leads.slice();
+    if (leadFilter === "open") list = list.filter(l => !my(l) && (l.for_who === 0 || l.for_who === S.me || l.by === S.me));
+    if (leadFilter === "mine") list = list.filter(l => l.for_who === S.me || (l.for_who === 0 && l.by !== S.me));
+    const cards = list.length ? list.map(leadCard) : [el("p", { class: "hint" }, S.leads.length ? "Nothing in this view." : "No leads yet. Share the first role you find for either of you.")];
+    return [el("div", { class: "row", style: "justify-content:space-between" }, el("h2", {}, "Leads"), filters), ...cards, form];
+  }
+  function leadCard(l) {
+    const s = l.status[S.me], url = safeUrl(l.url);
+    const forTxt = l.for_who === 0 ? "for both" : l.for_who === S.me ? "for you" : `for ${nameOf(l.for_who)}`;
+    const others = Object.entries(l.status).filter(([id, v]) => Number(id) !== S.me && v === "applied").map(([id]) => `${nameOf(Number(id))} applied`);
+    const when = new Date(l.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    return el("div", { class: "card lead" + (s === "applied" ? " done" : s === "skip" ? " skip" : "") },
+      el("h3", {}, url ? el("a", { href: url, target: "_blank", rel: "noopener", onclick: e => { if (tg) { e.preventDefault(); tg.openLink(url); } } }, l.title) : l.title),
+      el("div", { class: "meta" }, [l.company, `from ${nameOf(l.by)}`, forTxt, when, ...others].filter(Boolean).join(" · ")),
+      l.note ? el("p", {}, l.note) : null,
+      el("div", { class: "row" },
+        [["applied", "I applied"], ["skip", "Not for me"]].map(([v, label]) => el("button", { type: "button", class: s === v ? "sel" : "", onclick: () => { haptic(); act("POST", `/leads/${l.id}/status`, { status: s === v ? null : v }); } }, label)),
+        l.by === S.me ? el("button", { type: "button", onclick: () => act("DELETE", `/leads/${l.id}`) }, "Remove") : null));
+  }
+
+  // ---- Week ----------------------------------------------------------------
+  function viewWeek() {
+    const ref = me().week.map(w => w.date);
+    const head = el("tr", {}, el("th", { style: "text-align:left" }, "Who"), ref.map(d => { const dt = new Date(d + "T12:00:00"); return el("th", {}, dt.toLocaleDateString(undefined, { weekday: "short" }).slice(0, 2), el("br"), String(dt.getDate())); }), el("th", { style: "text-align:right" }, "Apps · Full"));
+    const rows = S.members.map(m => {
+      let apps = 0, full = 0;
+      const cells = m.week.map(w => {
+        const d = w.day, a = d ? d.apps : 0; apps += a;
+        const isFull = hitAll(m, d); if (isFull) full++;
+        const any = d && (d.in_at || d.apps || d.outreach || d.commits);
+        return el("td", {}, el("span", { class: "hole" + (isFull ? " full" : any ? " part" : ""), title: d ? `${d.apps} applications, ${d.outreach} outreach, ${d.commits} commits` : "Nothing logged" }, any ? String(a) : ""));
+      });
+      return el("tr", {}, el("td", { class: "name" }, m.id === S.me ? "You" : m.name), cells, el("td", { class: "tot" }, `${apps} · ${full}/7`));
+    });
+    return [el("div", { class: "card" }, el("h2", {}, "Last 7 days"), el("p", { class: "hint" }, "Filled = every daily goal hit. The number is applications sent. Each row uses that person's own time zone."),
+      el("div", { class: "gridwrap" }, el("table", {}, el("thead", {}, head), el("tbody", {}, rows))))];
+  }
+
+  // ---- Setup ---------------------------------------------------------------
+  function viewSetup() {
+    const m = me(), s = S.session;
+    const goals = el("form", { class: "card" }, el("h2", {}, "My daily minimums"),
+      el("div", { class: "goalrow" }, COUNTS.map(([k, label]) => el("label", { class: "field" }, el("span", {}, label), el("input", { id: "g-" + k, type: "number", min: "0", max: "50", value: String(m.goals[k]) })))),
+      el("label", { class: "field" }, el("span", {}, "My time zone"), el("input", { id: "g-tz", value: m.tz, placeholder: "Asia/Shanghai" })),
+      el("div", { class: "row", style: "justify-content:flex-end" }, el("button", { class: "primary", type: "submit" }, "Save")));
+    goals.addEventListener("submit", async e => {
+      e.preventDefault();
+      const body = { goals: Object.fromEntries(COUNTS.map(([k]) => [k, Number($("#g-" + k).value) || 0])), tz: $("#g-tz").value.trim() };
+      if (await act("POST", "/me", body)) toast("Saved.");
+    });
+    const sess = el("form", { class: "card" }, el("h2", {}, "Live sessions"),
+      el("div", { class: "days" }, WEEKDAYS.map(d => el("label", {}, el("input", { type: "checkbox", value: d, checked: s.days.includes(d) }), d))),
+      el("div", { class: "goalrow", style: "grid-template-columns:1fr 2fr" },
+        el("label", { class: "field" }, el("span", {}, `Time (${s.tz})`), el("input", { id: "s-time", value: s.time, placeholder: "20:00", inputmode: "numeric" })),
+        el("label", { class: "field" }, el("span", {}, "Call link"), el("input", { id: "s-link", value: s.link, placeholder: "https://meet.google.com/…" }))),
+      s.local && s.local !== s.time ? el("p", { class: "hint" }, `That's ${s.local} for you.`) : null,
+      el("p", { class: "hint" }, "The bot posts a reminder 15 minutes before each session."),
+      el("div", { class: "row", style: "justify-content:flex-end" }, el("button", { class: "primary", type: "submit" }, "Save")));
+    sess.addEventListener("submit", async e => {
+      e.preventDefault();
+      const body = { days: [...sess.querySelectorAll(".days input:checked")].map(x => x.value), time: $("#s-time").value.trim(), link: $("#s-link").value.trim() };
+      if (await act("POST", "/session", body)) toast("Saved.");
+    });
+    const rules = el("div", { class: "card" }, el("h2", {}, "The deal"), el("ol", { style: "margin:0;padding-left:20px;display:grid;gap:6px" },
+      ["Clock in with today's plan before you start.", "Hit your daily minimums and log them as they happen.", "Any role that fits the other person goes in Leads.", "Clock out with what got done and anything blocking you.", "Sunday: look at the Week tab together and adjust goals.", "Missed a day? Say so in your card and pick it back up tomorrow."].map(t => el("li", {}, t))));
+    return [goals, sess, rules];
+  }
+
+  load();
+  setInterval(() => { if (!document.hidden && !(document.activeElement && /^(t-|todoText|l|g-|s-)/.test(document.activeElement.id || ""))) load(); }, 20000);
+  setInterval(tickClock, 20000);
+})();
+</script>
+</body>
+</html>
