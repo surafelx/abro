@@ -8,7 +8,7 @@
 // and explains why, so every link is real. Without an AI key the feed still fills with the
 // top items from each source.
 import { env } from "./env";
-import { one, q } from "./db";
+import { NO_ID, col, nextId } from "./db";
 import { askJson, aiReady } from "./ai";
 import { COUNT_KEYS, Member, days, goalsOf, hitAll, leadStatus, members, todos } from "./store";
 import { dayKey, lastDays } from "./time";
@@ -18,6 +18,8 @@ export type FeedItem = { id: number; day: string; kind: FeedKind; for_member: nu
 type Candidate = { title: string; url: string; source: string; score: number; blurb?: string };
 
 const now = () => new Date().toISOString();
+const FI = () => col<FeedItem & { _id: number }>("feed_items");
+const FS = () => col<{ _id: string; item: number; member: number }>("feed_saves");
 const UA = { "user-agent": "Abro-feed/0.1 (+https://github.com)" };
 
 async function getJson<T>(url: string, headers: Record<string, string> = {}, retry = 1): Promise<T | null> {
@@ -47,8 +49,8 @@ async function sources(): Promise<Candidate[]> {
 }
 
 async function insert(day: string, kind: FeedKind, forMember: number, title: string, url: string, body: string, source: string, origin = "") {
-  await q("INSERT INTO feed_items (day, kind, for_member, title, url, body, source, created_at, origin) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-    [day, kind, forMember, title.slice(0, 200), url.slice(0, 600), body.slice(0, 1500), source.slice(0, 40), now(), origin.slice(0, 2000)]);
+  const id = await nextId("feed_items");
+  await FI().insertOne({ _id: id, id, day, kind, for_member: forMember, title: title.slice(0, 200), url: url.slice(0, 600), body: body.slice(0, 1500), source: source.slice(0, 40), created_at: now(), origin: origin.slice(0, 2000) });
 }
 
 const profileOf = (m: Member, key: string) => ({ key, name: m.name, focus: m.focus || "(not set: assume a software developer looking for remote work)" });
@@ -62,7 +64,7 @@ export async function buildDaily(): Promise<{ added: number; via: string }> {
   try {
     const day = dayKey(env.defaultTz);
     const ms = await members.all();
-    const seen = new Set((await q<{ url: string }>("SELECT url FROM feed_items WHERE created_at >= $1", [new Date(Date.now() - 30 * 86_400_000).toISOString()])).map(r => r.url));
+    const seen = new Set((await FI().find({ created_at: { $gte: new Date(Date.now() - 30 * 86_400_000).toISOString() } }, { projection: { url: 1 } }).toArray()).map(r => r.url));
     const cands = (await sources()).filter(c => c.url && !seen.has(c.url));
     if (!cands.length) return { added: 0, via: "no new items" };
     const keyOf = new Map(ms.map((m, i) => [`p${i + 1}`, m.id]));
@@ -116,7 +118,7 @@ export async function buildSparks(given?: Candidate[]): Promise<number> {
     const w = await weekSummary(m);
     return { key: `p${i + 1}`, name: m.name, focus: w.focus, recentPlans: w.plans.slice(-3), recentBlockers: w.blockers.slice(-3), weekTotals: w.weekTotals };
   }));
-  const recent = (await q<{ title: string }>("SELECT title FROM feed_items WHERE kind = 'spark' AND created_at >= $1", [new Date(Date.now() - 30 * 86_400_000).toISOString()])).map(r => r.title);
+  const recent = (await FI().find({ kind: "spark", created_at: { $gte: new Date(Date.now() - 30 * 86_400_000).toISOString() } }, { projection: { title: 1 } }).toArray()).map(r => r.title);
   const { data } = await askJson<{ ideas: { for: string; type: string; title: string; pitch: string; first_step: string; how: string; inspired_by: number[] }[] }>({
     system: "You are a creative partner for two developers who are job hunting and building portfolios. You come up with original, specific ideas, never generic advice, and you're open about how you got to each one. Answer with JSON only.",
     prompt: `People:\n${JSON.stringify(people)}\n\nWhat's moving this week (numbered):\n${cands.map((c, i) => `${i}. [${c.source}] ${c.title}${c.blurb ? ` — ${c.blurb}` : ""}`).join("\n")}\n\n` +
@@ -191,17 +193,17 @@ export async function buildWeekly(): Promise<{ added: number; via: string }> {
 export const feedSources = sources;
 
 export const feed = {
-  list: (limit = 80) => q<FeedItem>("SELECT * FROM feed_items ORDER BY id DESC LIMIT $1", [limit]),
-  today: () => q<FeedItem>("SELECT * FROM feed_items WHERE day = $1 ORDER BY id", [dayKey(env.defaultTz)]),
-  get: (id: number) => one<FeedItem>("SELECT * FROM feed_items WHERE id = $1", [id]),
+  list: (limit = 80) => FI().find({}, NO_ID).sort({ id: -1 }).limit(limit).toArray() as Promise<FeedItem[]>,
+  today: () => FI().find({ day: dayKey(env.defaultTz) }, NO_ID).sort({ id: 1 }).toArray() as Promise<FeedItem[]>,
+  get: async (id: number) => (Number.isFinite(id) ? ((await FI().findOne({ _id: id }, NO_ID)) as FeedItem | null) ?? undefined : undefined),
   async saves(): Promise<Record<number, number[]>> {
     const out: Record<number, number[]> = {};
-    for (const r of await q<{ item: number; member: number }>("SELECT item, member FROM feed_saves")) (out[r.item] ??= []).push(r.member);
+    for (const r of await FS().find({}).toArray()) (out[r.item] ??= []).push(r.member);
     return out;
   },
   async toggleSave(item: number, member: number) {
-    const has = await one("SELECT 1 FROM feed_saves WHERE item = $1 AND member = $2", [item, member]);
-    if (has) await q("DELETE FROM feed_saves WHERE item = $1 AND member = $2", [item, member]);
-    else await q("INSERT INTO feed_saves (item, member) VALUES ($1, $2) ON CONFLICT DO NOTHING", [item, member]);
+    const _id = `${item}:${member}`;
+    if (await FS().findOne({ _id })) await FS().deleteOne({ _id });
+    else await FS().updateOne({ _id }, { $set: { item, member } }, { upsert: true });
   },
 };

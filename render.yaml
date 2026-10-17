@@ -29,6 +29,7 @@ services:
         sync: false
       - key: ADMIN_USER_ID
         sync: false
+      # MongoDB connection string, e.g. mongodb+srv://user:pass@cluster.xxxxx.mongodb.net/abro
       - key: DATABASE_URL
         sync: false
       - key: GEMINI_API_KEY

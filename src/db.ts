@@ -1,123 +1,41 @@
-import fs from "node:fs";
+import { Collection, Db, Document, MongoClient } from "mongodb";
 import { env } from "./env";
 
-// Tracking data lives in Postgres: Neon in production (DATABASE_URL=postgres://…),
-// an in-process PGlite folder for local dev when DATABASE_URL is empty or "pglite:<dir>".
+// Tracking data lives in MongoDB (Atlas in production, a local mongod for dev).
+// DATABASE_URL is a mongodb:// or mongodb+srv:// URI; the database name comes from the
+// URI path, or "abro" when the URI has none.
 
-type Row = Record<string, unknown>;
-let run: (text: string, params?: unknown[]) => Promise<Row[]>;
-
-const SCHEMA = [
-  `CREATE TABLE IF NOT EXISTS members (
-    id BIGINT PRIMARY KEY,               -- Telegram user id
-    name TEXT NOT NULL,
-    username TEXT,
-    tz TEXT NOT NULL,
-    goal_apps INTEGER NOT NULL DEFAULT 5,
-    goal_outreach INTEGER NOT NULL DEFAULT 3,
-    goal_commits INTEGER NOT NULL DEFAULT 1,
-    joined_at TEXT NOT NULL
-  )`,
-  `CREATE TABLE IF NOT EXISTS days (
-    member BIGINT NOT NULL,
-    date TEXT NOT NULL,                  -- YYYY-MM-DD in the member's time zone
-    apps INTEGER NOT NULL DEFAULT 0,
-    outreach INTEGER NOT NULL DEFAULT 0,
-    commits INTEGER NOT NULL DEFAULT 0,
-    plan TEXT NOT NULL DEFAULT '',
-    done TEXT NOT NULL DEFAULT '',
-    blocker TEXT NOT NULL DEFAULT '',
-    in_at TEXT,
-    out_at TEXT,
-    PRIMARY KEY (member, date)
-  )`,
-  `CREATE TABLE IF NOT EXISTS todos (
-    id SERIAL PRIMARY KEY,
-    owner BIGINT NOT NULL,               -- member id, or 0 for a shared todo
-    text TEXT NOT NULL,
-    created_by BIGINT NOT NULL,
-    created_at TEXT NOT NULL,
-    done_at TEXT,
-    done_by BIGINT
-  )`,
-  `CREATE TABLE IF NOT EXISTS lead_status (
-    lead TEXT NOT NULL,                  -- Apleo opportunity id
-    member BIGINT NOT NULL,
-    status TEXT NOT NULL,                -- applied | skip
-    PRIMARY KEY (lead, member)
-  )`,
-  `CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
-  `ALTER TABLE members ADD COLUMN IF NOT EXISTS focus TEXT NOT NULL DEFAULT ''`,
-  `CREATE TABLE IF NOT EXISTS feed_items (
-    id SERIAL PRIMARY KEY,
-    day TEXT NOT NULL,                   -- YYYY-MM-DD (DEFAULT_TZ) it was made for
-    kind TEXT NOT NULL,                  -- news | learn | try | idea | improve
-    for_member BIGINT NOT NULL DEFAULT 0, -- member id, or 0 for both
-    title TEXT NOT NULL,
-    url TEXT NOT NULL DEFAULT '',
-    body TEXT NOT NULL DEFAULT '',
-    source TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL
-  )`,
-  `CREATE TABLE IF NOT EXISTS works (
-    id SERIAL PRIMARY KEY,
-    member BIGINT NOT NULL,
-    kind TEXT NOT NULL,                  -- project | post | skill
-    title TEXT NOT NULL,
-    summary TEXT NOT NULL DEFAULT '',
-    details TEXT NOT NULL DEFAULT '',
-    stack TEXT NOT NULL DEFAULT '',      -- comma-separated
-    links TEXT NOT NULL DEFAULT '{}',    -- JSON {live, code, post}
-    status TEXT NOT NULL DEFAULT 'doing', -- doing | done
-    feed_item INTEGER,
-    portfolio_state TEXT NOT NULL DEFAULT 'none', -- none | draft | live
-    portfolio_url TEXT NOT NULL DEFAULT '',
-    in_resume BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  )`,
-  `CREATE TABLE IF NOT EXISTS drafts (
-    id SERIAL PRIMARY KEY,
-    member BIGINT NOT NULL,
-    work INTEGER,
-    feed_item INTEGER,
-    platform TEXT NOT NULL,              -- linkedin | x | devto
-    body TEXT NOT NULL,
-    created_at TEXT NOT NULL
-  )`,
-  `CREATE TABLE IF NOT EXISTS profiles (member BIGINT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT NOT NULL)`,
-  `CREATE TABLE IF NOT EXISTS resumes (member BIGINT PRIMARY KEY, data TEXT NOT NULL, target TEXT NOT NULL DEFAULT '', generated_at TEXT NOT NULL, published_at TEXT)`,
-  `CREATE TABLE IF NOT EXISTS portfolio_links (member BIGINT PRIMARY KEY, url TEXT NOT NULL, key_enc TEXT NOT NULL)`,
-  `ALTER TABLE feed_items ADD COLUMN IF NOT EXISTS origin TEXT NOT NULL DEFAULT ''`,
-  `ALTER TABLE drafts ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'draft'`, // draft | posted
-  `ALTER TABLE drafts ADD COLUMN IF NOT EXISTS posted_url TEXT NOT NULL DEFAULT ''`,
-  `ALTER TABLE drafts ADD COLUMN IF NOT EXISTS posted_at TEXT`,
-  `ALTER TABLE members ADD COLUMN IF NOT EXISTS goal_posts INTEGER NOT NULL DEFAULT 3`, // posts per week
-  `CREATE TABLE IF NOT EXISTS feed_saves (
-    item INTEGER NOT NULL,
-    member BIGINT NOT NULL,
-    PRIMARY KEY (item, member)
-  )`,
-];
+let db: Db | null = null;
 
 export async function connectDb() {
   const url = env.databaseUrl;
-  if (/^postgres(ql)?:\/\//.test(url)) {
-    const pg = (await import("pg")).default;
-    pg.types.setTypeParser(20, v => Number(v)); // BIGINT → number (Telegram ids fit)
-    const pool = new pg.Pool({ connectionString: url, max: 5 });
-    run = async (text, params) => (await pool.query(text, params as unknown[])).rows;
-    console.log("Tracking store: Postgres");
-  } else {
-    const { PGlite } = await import("@electric-sql/pglite");
-    const dir = url.replace(/^pglite:/, "") || "./data/pglite";
-    fs.mkdirSync(dir, { recursive: true });
-    const db = new PGlite(dir, { parsers: { 20: (v: string) => Number(v) } });
-    run = async (text, params) => (await db.query<Row>(text, params)).rows;
-    console.log(`Tracking store: local PGlite at ${dir} (set DATABASE_URL to use Neon)`);
-  }
-  for (const stmt of SCHEMA) await run(stmt);
+  if (!/^mongodb(\+srv)?:\/\//.test(url)) throw new Error("Set DATABASE_URL to your MongoDB connection string (mongodb+srv://… from Atlas, or mongodb://127.0.0.1:27017/abro locally).");
+  const client = new MongoClient(url, { maxPoolSize: 5, serverSelectionTimeoutMS: 15_000 });
+  await client.connect();
+  const name = new URL(url.replace(/^mongodb(\+srv)?:/, "http:")).pathname.replace(/^\//, "") || "abro";
+  db = client.db(name);
+  await Promise.all([
+    col("days").createIndex({ member: 1, date: 1 }),
+    col("todos").createIndex({ done_at: 1 }),
+    col("works").createIndex({ member: 1 }),
+    col("drafts").createIndex({ member: 1 }),
+    col("drafts").createIndex({ status: 1, posted_at: -1 }),
+    col("feed_items").createIndex({ day: 1 }),
+    col("feed_items").createIndex({ created_at: -1 }),
+  ]);
+  console.log(`Tracking store: MongoDB (${name})`);
 }
 
-export const q = <T = Row>(text: string, params: unknown[] = []) => run(text, params) as Promise<T[]>;
-export const one = async <T = Row>(text: string, params: unknown[] = []) => (await q<T>(text, params))[0];
+export function col<T extends Document = Document>(name: string): Collection<T> {
+  if (!db) throw new Error("The database isn't connected yet.");
+  return db.collection<T>(name);
+}
+
+/** Next number for a collection with readable ids (todos #12, work items, feed items). */
+export async function nextId(name: string): Promise<number> {
+  const r = await col<{ _id: string; n: number }>("counters").findOneAndUpdate({ _id: name }, { $inc: { n: 1 } }, { upsert: true, returnDocument: "after" });
+  return r!.n;
+}
+
+/** Read without Mongo's _id, so documents keep the plain shapes the rest of the app uses. */
+export const NO_ID = { projection: { _id: 0 } } as const;

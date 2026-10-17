@@ -23,7 +23,7 @@ A two-person accountability board: clock in, hit your daily minimums, share job 
 | What | Where |
 |---|---|
 | Job leads | **Apleo's** MongoDB, posted through Apleo's `/api/abro/leads`. Shared leads go live as public JOB listings on Apleo, tagged `feed: "abro"`, and retire after 30 days. |
-| Tracking: members, days, todos, who applied to which lead, sessions | **Neon** Postgres (`DATABASE_URL`). With no URL, a local PGlite folder is used for dev. |
+| Tracking: members, days, todos, work, posts, feed, resume, settings | **MongoDB** (`DATABASE_URL`, e.g. a free Atlas cluster). Required. |
 
 Joining is by approval: the admin (`ADMIN_USER_ID`) is always in. Anyone else who messages the bot sends the admin an Approve / Decline request.
 
@@ -39,7 +39,7 @@ npm run dev
 
 1. In Telegram, open **@BotFather** → `/newbot` → copy the token into `BOT_TOKEN`.
 2. Start the bot and send it `/id`. Put that number in `ADMIN_USER_ID` and restart.
-3. Create a Neon project and paste its connection string into `DATABASE_URL`. The tables are created on start.
+3. Create a free MongoDB Atlas cluster (or run `mongod` locally) and put its connection string in `DATABASE_URL`.
 4. On Apleo's API, set `ABRO_API_KEY` to a long random string. Put the same value in `APLEO_API_KEY` here, and set `APLEO_API_URL` to Apleo's API address.
 5. The Mini App needs HTTPS. Locally, run a tunnel and put its URL in `PUBLIC_URL`:
    `cloudflared tunnel --url http://localhost:8787`
@@ -50,7 +50,7 @@ Without `BOT_TOKEN` the board still runs, and announcements print to the console
 
 ## Deploy
 
-There's no local state (tracking is in Neon, leads are in Apleo), so any Node host works. Run a single instance.
+There's no local state (tracking is in MongoDB, leads are in Apleo), so any Node host works. Run a single instance.
 
 **Free, on Render:** create a Web Service from this repo (build `npm install`, start `npm start`), and set:
 - `BOT_MODE=webhook` and `WEBHOOK_SECRET`. Telegram then posts each message to `/tg`, which wakes the service.

@@ -3,7 +3,8 @@
 // each person's link to their portfolio's API (docs/PORTFOLIO_API.md).
 import crypto from "node:crypto";
 import { env } from "./env";
-import { one, q } from "./db";
+import { NO_ID, col, nextId } from "./db";
+import { kv } from "./store";
 
 const now = () => new Date().toISOString();
 
@@ -16,46 +17,52 @@ export type Work = {
 };
 export type Draft = { id: number; member: number; work: number | null; feed_item: number | null; platform: string; body: string; created_at: string; status: "draft" | "posted"; posted_url: string; posted_at: string | null };
 
+type WorkDoc = Work & { _id: number };
+const WK = () => col<WorkDoc>("works");
+const WORK_FIELDS = ["kind", "title", "summary", "details", "stack", "status", "portfolio_state", "portfolio_url", "in_resume", "links"];
+
 export const works = {
-  list: (member: number) => q<Work>("SELECT * FROM works WHERE member = $1 ORDER BY status = 'done', id DESC", [member]),
-  all: () => q<Work>("SELECT * FROM works ORDER BY id DESC LIMIT 200"),
-  get: (id: number) => (Number.isFinite(id) ? one<Work>("SELECT * FROM works WHERE id = $1", [id]) : Promise.resolve(undefined)),
+  list: (member: number) => WK().find({ member }, NO_ID).sort({ status: 1, id: -1 }).toArray() as Promise<Work[]>,
+  all: () => WK().find({}, NO_ID).sort({ id: -1 }).limit(200).toArray() as Promise<Work[]>,
+  get: async (id: number) => (Number.isFinite(id) ? ((await WK().findOne({ _id: id }, NO_ID)) as Work | null) ?? undefined : undefined),
   async add(member: number, w: { kind: WorkKind; title: string; summary?: string; details?: string; stack?: string; links?: Links; feedItem?: number | null; status?: "doing" | "done" }) {
-    const r = await one<{ id: number }>(
-      "INSERT INTO works (member, kind, title, summary, details, stack, links, status, feed_item, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10) RETURNING id",
-      [member, w.kind, w.title.slice(0, 160), (w.summary ?? "").slice(0, 400), (w.details ?? "").slice(0, 4000), (w.stack ?? "").slice(0, 300), JSON.stringify(w.links ?? {}), w.status ?? "doing", w.feedItem ?? null, now()]);
-    return r!.id;
+    const id = await nextId("works"), t = now();
+    await WK().insertOne({
+      _id: id, id, member, kind: w.kind, title: w.title.slice(0, 160), summary: (w.summary ?? "").slice(0, 400), details: (w.details ?? "").slice(0, 4000),
+      stack: (w.stack ?? "").slice(0, 300), links: JSON.stringify(w.links ?? {}), status: w.status ?? "doing", feed_item: w.feedItem ?? null,
+      portfolio_state: "none", portfolio_url: "", in_resume: false, created_at: t, updated_at: t,
+    });
+    return id;
   },
   async update(id: number, patch: Partial<Pick<Work, "kind" | "title" | "summary" | "details" | "stack" | "status" | "portfolio_state" | "portfolio_url" | "in_resume">> & { links?: Links }) {
-    const sets: string[] = [], vals: unknown[] = [];
-    for (const [k, v] of Object.entries(patch)) {
-      if (v === undefined) continue;
-      if (!["kind", "title", "summary", "details", "stack", "status", "portfolio_state", "portfolio_url", "in_resume", "links"].includes(k)) continue;
-      vals.push(k === "links" ? JSON.stringify(v) : v);
-      sets.push(`${k} = $${vals.length}`);
-    }
-    if (!sets.length) return;
-    vals.push(now(), id);
-    await q(`UPDATE works SET ${sets.join(", ")}, updated_at = $${vals.length - 1} WHERE id = $${vals.length}`, vals);
+    const set: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(patch)) if (v !== undefined && WORK_FIELDS.includes(k)) set[k] = k === "links" ? JSON.stringify(v) : v;
+    if (!Object.keys(set).length) return;
+    await WK().updateOne({ _id: id }, { $set: { ...set, updated_at: now() } });
   },
-  remove: (id: number) => q("DELETE FROM works WHERE id = $1", [id]),
+  remove: (id: number) => WK().deleteOne({ _id: id }),
 };
 
 export const linksOf = (w: Work): Links => { try { return JSON.parse(w.links) as Links; } catch { return {}; } };
 export const slugOf = (w: Work) => `abro-${w.id}-${w.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40)}`;
 
+type DraftDoc = Draft & { _id: number };
+const DR = () => col<DraftDoc>("drafts");
+
 export const drafts = {
-  list: (member: number) => q<Draft>("SELECT * FROM drafts WHERE member = $1 ORDER BY id DESC LIMIT 40", [member]),
-  get: (id: number) => one<Draft>("SELECT * FROM drafts WHERE id = $1", [id]),
+  list: (member: number) => DR().find({ member }, NO_ID).sort({ id: -1 }).limit(40).toArray() as Promise<Draft[]>,
+  get: async (id: number) => ((await DR().findOne({ _id: id }, NO_ID)) as Draft | null) ?? undefined,
   async add(member: number, d: { work?: number | null; feedItem?: number | null; platform: string; body: string }) {
-    await q("INSERT INTO drafts (member, work, feed_item, platform, body, created_at) VALUES ($1,$2,$3,$4,$5,$6)", [member, d.work ?? null, d.feedItem ?? null, d.platform, d.body.slice(0, 6000), now()]);
+    const id = await nextId("drafts");
+    await DR().insertOne({ _id: id, id, member, work: d.work ?? null, feed_item: d.feedItem ?? null, platform: d.platform, body: d.body.slice(0, 6000), created_at: now(), status: "draft", posted_url: "", posted_at: null });
   },
-  remove: (id: number) => q("DELETE FROM drafts WHERE id = $1", [id]),
-  setBody: (id: number, body: string) => q("UPDATE drafts SET body = $1 WHERE id = $2", [body.slice(0, 6000), id]),
-  markPosted: (id: number, url: string) => q("UPDATE drafts SET status = 'posted', posted_url = $1, posted_at = $2 WHERE id = $3", [url.slice(0, 600), now(), id]),
-  unmarkPosted: (id: number) => q("UPDATE drafts SET status = 'draft', posted_url = '', posted_at = NULL WHERE id = $1", [id]),
+  remove: (id: number) => DR().deleteOne({ _id: id }),
+  setBody: (id: number, body: string) => DR().updateOne({ _id: id }, { $set: { body: body.slice(0, 6000) } }),
+  markPosted: (id: number, url: string) => DR().updateOne({ _id: id }, { $set: { status: "posted", posted_url: url.slice(0, 600), posted_at: now() } }),
+  unmarkPosted: (id: number) => DR().updateOne({ _id: id }, { $set: { status: "draft", posted_url: "", posted_at: null } }),
   /** Posts marked posted since `sinceIso` (anyone, newest first). */
-  postedSince: (sinceIso: string) => q<Draft>("SELECT * FROM drafts WHERE status = 'posted' AND posted_at >= $1 ORDER BY posted_at DESC", [sinceIso]),
+  postedSince: (sinceIso: string) => DR().find({ status: "posted", posted_at: { $gte: sinceIso } }, NO_ID).sort({ posted_at: -1 }).toArray() as Promise<Draft[]>,
+  countPosted: (member: number, sinceIso: string) => DR().countDocuments({ member, status: "posted", posted_at: { $gte: sinceIso } }),
 };
 
 // ---- Brand: post ideas and the profile check, kept per person -------------------
@@ -63,12 +70,12 @@ export type PostIdea = { hook: string; angle: string; platform: string; from: st
 export type ProfileCheck = { xBio: string; linkedinHeadline: string; linkedinAbout: string; pinnedPost: string; tips: string[]; at: string };
 export const brand = {
   async get(member: number): Promise<{ ideas: PostIdea[]; check: ProfileCheck | null }> {
-    const r = await one<{ value: string }>("SELECT value FROM kv WHERE key = $1", [`brand:${member}`]);
-    try { return { ideas: [], check: null, ...(r ? JSON.parse(r.value) : {}) }; } catch { return { ideas: [], check: null }; }
+    const v = await kv.json<{ ideas?: PostIdea[]; check?: ProfileCheck | null }>(`brand:${member}`, {});
+    return { ideas: v.ideas ?? [], check: v.check ?? null };
   },
   async set(member: number, patch: Partial<{ ideas: PostIdea[]; check: ProfileCheck | null }>) {
     const cur = await brand.get(member);
-    await q("INSERT INTO kv (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [`brand:${member}`, JSON.stringify({ ...cur, ...patch })]);
+    await kv.set(`brand:${member}`, JSON.stringify({ ...cur, ...patch }));
   },
 };
 
@@ -86,22 +93,23 @@ export const emptyProfile = (): Profile => ({ name: "", headline: "", location: 
 
 export type Resume = Profile & { projects: { title: string; when?: string; summary: string; bullets: string[]; stack: string; link?: string }[] };
 
+const PR = () => col<{ _id: number; data: Profile; updated_at: string }>("profiles");
 export const profiles = {
   async get(member: number): Promise<Profile> {
-    const r = await one<{ data: string }>("SELECT data FROM profiles WHERE member = $1", [member]);
-    try { return { ...emptyProfile(), ...(r ? JSON.parse(r.data) : {}) }; } catch { return emptyProfile(); }
+    const r = await PR().findOne({ _id: member });
+    return { ...emptyProfile(), ...(r?.data ?? {}) };
   },
-  set: (member: number, p: Profile) => q("INSERT INTO profiles (member, data, updated_at) VALUES ($1,$2,$3) ON CONFLICT (member) DO UPDATE SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at", [member, JSON.stringify(p), now()]),
+  set: (member: number, p: Profile) => PR().updateOne({ _id: member }, { $set: { data: p, updated_at: now() } }, { upsert: true }),
 };
 
+type ResumeDoc = { _id: number; data: Resume; target: string; generated_at: string; published_at: string | null };
+const RS = () => col<ResumeDoc>("resumes");
 export const resumes = {
-  async get(member: number): Promise<{ data: Resume; target: string; generated_at: string; published_at: string | null } | null> {
-    const r = await one<{ data: string; target: string; generated_at: string; published_at: string | null }>("SELECT * FROM resumes WHERE member = $1", [member]);
-    if (!r) return null;
-    try { return { ...r, data: JSON.parse(r.data) as Resume }; } catch { return null; }
+  async get(member: number): Promise<Omit<ResumeDoc, "_id"> | null> {
+    return (await RS().findOne({ _id: member }, NO_ID)) as Omit<ResumeDoc, "_id"> | null;
   },
-  set: (member: number, data: Resume, target: string) => q("INSERT INTO resumes (member, data, target, generated_at) VALUES ($1,$2,$3,$4) ON CONFLICT (member) DO UPDATE SET data = EXCLUDED.data, target = EXCLUDED.target, generated_at = EXCLUDED.generated_at", [member, JSON.stringify(data), target.slice(0, 200), now()]),
-  markPublished: (member: number) => q("UPDATE resumes SET published_at = $1 WHERE member = $2", [now(), member]),
+  set: (member: number, data: Resume, target: string) => RS().updateOne({ _id: member }, { $set: { data, target: target.slice(0, 200), generated_at: now() }, $setOnInsert: { published_at: null } }, { upsert: true }),
+  markPublished: (member: number) => RS().updateOne({ _id: member }, { $set: { published_at: now() } }),
 };
 
 // ---- Portfolio link (key encrypted at rest) --------------------------------------
@@ -123,13 +131,14 @@ export function open(sealed: string) {
   return Buffer.concat([d.update(enc), d.final()]).toString("utf8");
 }
 
+const PL = () => col<{ _id: number; url: string; key_enc: string }>("portfolio_links");
 export const portfolioLinks = {
   async get(member: number): Promise<{ url: string; key: string } | null> {
-    const r = await one<{ url: string; key_enc: string }>("SELECT url, key_enc FROM portfolio_links WHERE member = $1", [member]);
+    const r = await PL().findOne({ _id: member });
     if (!r) return null;
     try { return { url: r.url, key: open(r.key_enc) }; } catch { return null; }
   },
-  async urlOf(member: number) { return (await one<{ url: string }>("SELECT url FROM portfolio_links WHERE member = $1", [member]))?.url ?? null; },
-  set: (member: number, url: string, key: string) => q("INSERT INTO portfolio_links (member, url, key_enc) VALUES ($1,$2,$3) ON CONFLICT (member) DO UPDATE SET url = EXCLUDED.url, key_enc = EXCLUDED.key_enc", [member, url.replace(/\/+$/, ""), seal(key)]),
-  remove: (member: number) => q("DELETE FROM portfolio_links WHERE member = $1", [member]),
+  async urlOf(member: number) { return (await PL().findOne({ _id: member }))?.url ?? null; },
+  set: (member: number, url: string, key: string) => PL().updateOne({ _id: member }, { $set: { url: url.replace(/\/+$/, ""), key_enc: seal(key) } }, { upsert: true }),
+  remove: (member: number) => PL().deleteOne({ _id: member }),
 };

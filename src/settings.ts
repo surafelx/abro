@@ -2,7 +2,7 @@
 // Stored in kv as `setting:<NAME>`, secrets encrypted with ENCRYPTION_KEY. A value set here
 // overrides the host's env var of the same name; clearing it falls back to the env var.
 import { env, hasOverride, setOverride } from "./env";
-import { q } from "./db";
+import { kv } from "./store";
 import { open, seal } from "./work";
 
 export type SettingDef = { name: string; label: string; group: "AI" | "Apleo"; secret: boolean; placeholder: string; check?: (v: string) => string | null };
@@ -24,7 +24,7 @@ export const onSettingsChange = (fn: () => void) => { listeners.push(fn); };
 
 /** Load saved settings into the env overrides. Call once after the database connects. */
 export async function loadSettings() {
-  const rows = await q<{ key: string; value: string }>("SELECT key, value FROM kv WHERE key LIKE 'setting:%'");
+  const rows = await kv.startingWith("setting:");
   for (const r of rows) {
     const name = r.key.slice("setting:".length);
     const def = byName.get(name);
@@ -60,10 +60,10 @@ export async function saveSetting(name: string, raw: string) {
     const problem = def.check?.(value);
     if (problem) throw new Error(problem);
     if (def.secret && !env.encryptionKey) throw new Error("Set ENCRYPTION_KEY on the server first, so keys can be stored safely.");
-    await q("INSERT INTO kv (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [`setting:${name}`, def.secret ? seal(value) : value]);
+    await kv.set(`setting:${name}`, def.secret ? seal(value) : value);
     setOverride(name, value);
   } else {
-    await q("DELETE FROM kv WHERE key = $1", [`setting:${name}`]);
+    await kv.del(`setting:${name}`);
     setOverride(name, null);
   }
   for (const fn of listeners) fn();
