@@ -6,6 +6,12 @@ A two-person accountability board: clock in, hit your daily minimums, share job 
 - **Mini App** (`public/index.html`): a phone-style app with a bottom bar (Today · Feed · Leads · Todos) and Setup behind the header button. Neo-brutalist; follows Telegram's light or dark mode. Signed in by Telegram's `initData`, checked on the server.
 - **Feed** (`src/feed.ts`): every morning at `FEED_AT`, picks from Hacker News, dev.to and GitHub's fastest-rising repos, chosen and explained for each person's focus (`/focus`, or Setup). On Sundays it adds a "what to improve" note per person, based on their week, plus two project ideas each. AI: Gemini first (`GEMINI_API_KEY`), OpenRouter as the fallback (`OPENROUTER_API_KEY`). With neither, the feed shows the top items without picks.
 - **Do it, show it** (`src/workActions.ts`): every feed card has **+ Todo**, **Do it** (starts it as a project or skill in your work) and **Write about it** (AI drafts a LinkedIn post, an X thread and a dev.to outline). Your work items can go **To portfolio** as a hidden draft (AI tidies the write-up), then **Publish**. Tick **Resume** on the ones to feature.
+- **Brand** (You → Brand): marketing yourself, tracked like everything else.
+  - A weekly posting goal (Setup), shown on both Today cards.
+  - Post ideas made from your own week (plans, done, blockers, work), each turned into an X or LinkedIn draft.
+  - One-tap posting through X and LinkedIn share links, so no paid APIs or keys are needed.
+  - **Mark posted** sends your partner the link to boost while it's fresh.
+  - A profile check rewrites your X bio, LinkedIn headline and About, and lists what to fix first.
 - **Resume** (`src/writer.ts`, `src/resumeDoc.ts`): you fill a profile once, or import it from your portfolio. Abro then writes a one-page resume aimed at a role you name, from your profile and the work you ticked. You can preview it in the app, download it as PDF or Word, have the bot send both files, or put it on your portfolio.
 - **Portfolio API** (`docs/PORTFOLIO_API.md`): each person links their own site in Setup (address + key; the key is encrypted with `ENCRYPTION_KEY`). Any site that implements the contract works. Surafel's portfolio26 implements it at `/api/abro`.
 - **Reminders** (`src/reminders.ts`): a "clock in" DM at `NUDGE_AT` in each person's time zone, a nightly recap at `RECAP_AT`, and a heads-up 15 minutes before a live session.

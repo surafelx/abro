@@ -5,8 +5,10 @@ import { Member, todos } from "./store";
 import { feed } from "./feed";
 import { aiReady } from "./ai";
 import { announce, esc, sendFile } from "./notify";
-import { Platform, PLATFORMS, draftPosts, polishForPortfolio, writeResume } from "./writer";
-import { Resume, WorkKind, drafts, profiles, resumes, works } from "./work";
+import { Platform, PLATFORMS, checkProfile, draftFromIdea, draftPosts, polishForPortfolio, postIdeas, writeResume } from "./writer";
+import { Resume, WorkKind, brand, drafts, profiles, resumes, works } from "./work";
+import { days } from "./store";
+import { lastDays } from "./time";
 import { portfolio } from "./portfolio";
 import { resumeDocx, resumePdf } from "./resumeDoc";
 
@@ -34,7 +36,7 @@ export async function doFromFeed(m: Member, itemId: number, action: "todo" | "pr
     return { message: kind === "skill" ? "Added to your work as a skill you're learning." : "Started as a project in your work.", work: id };
   }
   await writeAbout(m, { itemId }, ["linkedin", "x", "devto"]);
-  return { message: "Drafted posts. They're under You → Writing." };
+  return { message: "Drafted posts. They're under You → Brand." };
 }
 
 export async function writeAbout(m: Member, src: { workId?: number; itemId?: number }, platforms: Platform[]) {
@@ -97,6 +99,54 @@ export async function deleteWork(m: Member, id: number) {
   const w = await ownWork(m, id);
   if (w.portfolio_state !== "none") await portfolio.remove(m.id, w).catch(() => {});
   await works.remove(id);
+}
+
+// ---- Brand ------------------------------------------------------------------------
+
+const weekStart = () => new Date(Date.now() - 7 * 86_400_000).toISOString();
+
+export async function brandIdeas(m: Member) {
+  if (!aiReady()) throw new UserError("Post ideas need an AI key on the server (GEMINI_API_KEY or OPENROUTER_API_KEY).");
+  const keys = lastDays(m.tz, 7);
+  const ds = await days.since(m.id, keys[0]);
+  const ws = await works.list(m.id);
+  const recentPosts = (await drafts.list(m.id)).filter(d => d.status === "posted").slice(0, 8).map(d => d.body.split("\n")[0].slice(0, 120));
+  const ideas = await postIdeas(m, {
+    plans: ds.map(d => d.plan).filter(Boolean).slice(-5), done: ds.map(d => d.done).filter(Boolean).slice(-5), blockers: ds.map(d => d.blocker).filter(Boolean).slice(-5),
+    works: ws.slice(0, 8).map(w => ({ title: w.title, status: w.status, summary: w.summary })), recentPosts,
+  });
+  if (!ideas.length) throw new UserError("No ideas came back. Log a little more of your week (plan, done, work) and try again.");
+  await brand.set(m.id, { ideas });
+  return ideas.length;
+}
+
+export async function draftIdea(m: Member, index: number, platform: Platform) {
+  if (!aiReady()) throw new UserError("Drafting needs an AI key on the server.");
+  const { ideas } = await brand.get(m.id);
+  const idea = need(ideas[index], "That idea is gone. Make new ones.");
+  const body = await draftFromIdea(m, idea, platform);
+  if (!body) throw new UserError("The draft came back empty. Try again.");
+  await drafts.add(m.id, { platform, body });
+}
+
+export async function runProfileCheck(m: Member) {
+  if (!aiReady()) throw new UserError("The profile check needs an AI key on the server.");
+  const check = await checkProfile(m, await profiles.get(m.id), await works.list(m.id));
+  await brand.set(m.id, { check });
+}
+
+/** Mark a draft as posted; the partner gets the link so they can boost it early. */
+export async function markPosted(m: Member, id: number, url: string) {
+  const d = need(await drafts.get(id), "That draft is gone.");
+  if (d.member !== m.id) throw new UserError("That draft belongs to your partner.");
+  await drafts.markPosted(id, url);
+  const n = (await drafts.postedSince(weekStart())).filter(p => p.member === m.id).length;
+  const where = PLATFORMS[d.platform as Platform] ?? d.platform;
+  await announce(`📣 <b>${esc(m.name)}</b> posted on ${esc(where)} (${n}/${m.goal_posts} this week).${url ? `\n${esc(url)}\nGive it a like or a reply while it's fresh.` : ""}`, { from: m.id });
+}
+
+export async function postsThisWeek(member: number) {
+  return (await drafts.postedSince(weekStart())).filter(p => p.member === member).length;
 }
 
 // ---- Resume -----------------------------------------------------------------------

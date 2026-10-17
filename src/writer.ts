@@ -2,7 +2,7 @@
 import { askJson } from "./ai";
 import { FeedItem } from "./feed";
 import { Member } from "./store";
-import { Profile, Resume, Work, linksOf } from "./work";
+import { PostIdea, Profile, ProfileCheck, Resume, Work, linksOf } from "./work";
 
 const STYLE = "Write plainly, the way a working developer talks. Specific over clever. No hype words (revolutionary, game-changer, unlock, delve, leverage), no emoji walls, no hashtag spam (at most 3 hashtags, only on LinkedIn and X).";
 
@@ -24,6 +24,53 @@ export async function draftPosts(m: Member, source: { work?: Work; item?: FeedIt
       `Only claim what the facts above support. Use the platform keys ${platforms.map(p => `"${p}"`).join(", ")}. Return {"posts":[{"platform":"…","body":"…"}]}.`,
   });
   return (data.posts ?? []).filter(p => p.platform in PLATFORMS && p.body);
+}
+
+/**
+ * Build-in-public post ideas from the person's own week: what they planned, finished, got stuck on
+ * and built. Each idea says which part of their week it came from.
+ */
+export async function postIdeas(m: Member, week: { plans: string[]; done: string[]; blockers: string[]; works: { title: string; status: string; summary: string }[]; recentPosts: string[] }): Promise<PostIdea[]> {
+  const { data } = await askJson<{ ideas: PostIdea[] }>({
+    system: `You help a developer market themselves while job hunting by building in public. ${STYLE} Ideas must come from their real week, never generic ("5 tips for…"). Answer with JSON only.`,
+    prompt: `Person: ${m.name}. Focus: ${m.focus || "software developer"}.\nTheir week:\n${JSON.stringify(week)}\n\n` +
+      `Give 5 post ideas. Mix: a lesson from something hard, a small win with a concrete detail, a behind-the-scenes look at how they work, an opinion grounded in what they did, and a question to their network.\n` +
+      `For each: "hook" (the opening line, under 140 characters, specific and a little surprising), "angle" (one sentence on what the post covers), "platform" ("x" or "linkedin", whichever fits better), "from" (which part of their week it comes from, in a few words).\n` +
+      `Avoid repeating these recent posts: ${JSON.stringify(week.recentPosts)}. Return {"ideas":[...]}.`,
+    temperature: 0.85,
+  });
+  return (data.ideas ?? []).filter(i => i.hook).slice(0, 5).map(i => ({ hook: String(i.hook).slice(0, 200), angle: String(i.angle ?? "").slice(0, 300), platform: i.platform === "linkedin" ? "linkedin" : "x", from: String(i.from ?? "").slice(0, 120) }));
+}
+
+/** Write a post from one idea, for one platform. */
+export async function draftFromIdea(m: Member, idea: PostIdea, platform: Platform) {
+  const { data } = await askJson<{ body: string }>({
+    system: `You ghost-write posts for a developer building in public. ${STYLE} Answer with JSON only.`,
+    prompt: `Author: ${m.name}. Focus: ${m.focus || "software developer"}.\nIdea: ${JSON.stringify(idea)}\n\n` +
+      (platform === "x" ? "Write it for X: a single post under 270 characters, or a thread of 3–5 numbered tweets (1/, 2/…) separated by blank lines if it needs more room. Start with the hook." :
+       platform === "linkedin" ? "Write it for LinkedIn: 120–220 words, open with the hook, short paragraphs, end with a light question." :
+       "Write a dev.to outline: a '# ' title, a 2-sentence intro, then 4–6 '## ' headings with a line each.") +
+      ` Return {"body":"…"}.`,
+  });
+  return String(data.body ?? "").trim();
+}
+
+/** Rewrite their X bio and LinkedIn headline/About from their focus and real work. */
+export async function checkProfile(m: Member, profile: Profile, works: Work[]): Promise<ProfileCheck> {
+  const { data } = await askJson<Omit<ProfileCheck, "at">>({
+    system: `You help developers present themselves to recruiters and peers online. ${STYLE} Use only facts from the input. Answer with JSON only.`,
+    prompt: `Focus / target: ${m.focus || "software developer"}\nProfile: ${JSON.stringify({ headline: profile.headline, summary: profile.summary, experience: profile.experience.slice(0, 4), skills: profile.skills })}\n` +
+      `Work: ${JSON.stringify(works.slice(0, 8).map(w => ({ title: w.title, summary: w.summary, stack: w.stack, status: w.status })))}\n\n` +
+      `Return {"xBio": under 160 characters, says what they build and for whom, "linkedinHeadline": under 200 characters, role + proof + what they want next, ` +
+      `"linkedinAbout": 3 short paragraphs, first person, "pinnedPost": the opening of a post worth pinning on X that shows their best work (2–3 sentences), ` +
+      `"tips": 3 specific things to fix on their profiles this week}.`,
+    temperature: 0.5,
+  });
+  return {
+    xBio: String(data.xBio ?? "").slice(0, 200), linkedinHeadline: String(data.linkedinHeadline ?? "").slice(0, 240),
+    linkedinAbout: String(data.linkedinAbout ?? "").slice(0, 2600), pinnedPost: String(data.pinnedPost ?? "").slice(0, 600),
+    tips: (Array.isArray(data.tips) ? data.tips : []).map(String).slice(0, 5), at: new Date().toISOString(),
+  };
 }
 
 /** Turn a rough work item into a portfolio-ready entry. */

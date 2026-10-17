@@ -33,6 +33,7 @@ const HELP = `<b>Abro</b> · አብሮ · together, on the clock
 <b>Show your work</b>
 /built <i>what you made</i> · log it (then add it to your portfolio on the board)
 /resume · get your latest resume as PDF and Word
+Brand (posting goal, post ideas from your week, one-tap posting, profile check) is under You → Brand on the board.
 
 <b>Team</b>
 /today · both time cards

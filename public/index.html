@@ -168,6 +168,11 @@ details.origin{border-left:var(--sw) solid var(--magenta);padding:2px 0 2px 10px
 details.origin>summary{cursor:pointer;font:800 11px var(--mono);letter-spacing:.06em;text-transform:uppercase}
 details.origin p{margin:6px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
 .slim.go{background:var(--magenta);color:#000;border-color:#000}
+.big{font:800 40px/1 var(--mono);font-variant-numeric:tabular-nums}
+.big small{font-size:18px;color:var(--muted)}
+.bar{height:16px;border:var(--sw) solid var(--stroke);border-radius:3px;background:var(--well);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--teal);border-right:var(--sw) solid var(--stroke);box-shadow:0 0 12px var(--glow)}
+.eyebrow{font:800 11px var(--mono);letter-spacing:.08em;text-transform:uppercase}
 .gate{padding:40px 20px;text-align:center;display:grid;gap:10px;justify-items:center}
 a{color:inherit}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -249,7 +254,7 @@ a{color:inherit}
       feed: F ? `${F.items.filter(i => i.day === today && (i.for_member === 0 || i.for_member === S.me)).length} picks today` : "Loading…",
       leads: `${S.leads.filter(l => !l.status[S.me] && (l.forWho === 0 || l.forWho === S.me)).length} open for you`,
       todos: `${S.todos.filter(t => !t.done_at && (t.owner === S.me || t.owner === 0)).length} open`,
-      you: Y ? `${Y.works.filter(w => w.status === "doing").length} doing · ${Y.works.filter(w => w.portfolio_state === "live").length} live on portfolio` : "Work, writing and resume",
+      you: !Y || !Y.works ? "Work, brand and resume" : youSeg === "brand" && Y.brand ? `${Y.brand.postedThisWeek}/${Y.brand.goal} posts this week` : `${Y.works.filter(w => w.status === "doing").length} doing · ${Y.works.filter(w => w.portfolio_state === "live").length} live`,
       setup: "Goals, focus, sessions, portfolio",
     }[tab] || "";
     $("#pageTitle").textContent = { today: "Today", feed: "Feed", leads: "Leads", todos: "Todos", you: "You", setup: "Setup" }[tab] || "Abro";
@@ -296,7 +301,9 @@ a{color:inherit}
     const punch = el("div", { class: "punch" }, el("span", { class: d.in_at ? "on" : "" }, `IN ${hm(d.in_at, m.tz)}`), el("span", { class: d.out_at ? "on" : "" }, `OUT ${hm(d.out_at, m.tz)}`));
     if (!d.in_at) punch.append(el("button", { class: "stampbtn in", type: "button", onclick: () => { haptic("medium"); act("POST", "/day/clock", { action: "in" }); } }, "Clock in"));
     else if (!d.out_at) punch.append(el("button", { class: "stampbtn out", type: "button", onclick: () => { haptic("medium"); act("POST", "/day/clock", { action: "out" }); } }, "Clock out"));
-    const card = el("div", { class: "card me" }, el("div", { class: "who" }, el("b", {}, m.name), el("span", { class: "tag" }, "you · today")), punch, counts(m, d, true));
+    const card = el("div", { class: "card me" }, el("div", { class: "who" }, el("b", {}, m.name), el("span", { class: "tag" }, "you · today")), punch, counts(m, d, true),
+      el("div", { class: "row", style: "justify-content:space-between" }, el("span", { class: "bdg " + (m.postedThisWeek >= m.goalPosts && m.goalPosts ? "t" : "") }, `${m.postedThisWeek}/${m.goalPosts} posts this week`),
+        el("button", { type: "button", class: "slim", onclick: () => { youSeg = "brand"; setTab("you"); } }, "Post something")));
     for (const [k, label, ph] of [["plan", "Today's plan", "5 applications, finish the README, 1 cold email"], ["done", "What got done", "Fill in at clock-out"], ["blocker", "Blocked on", "Anything you need from your partner"]]) {
       const ta = el("textarea", { id: "t-" + k, maxlength: "2000", rows: k === "plan" ? "3" : "2", placeholder: ph });
       ta.value = d[k] || "";
@@ -309,6 +316,7 @@ a{color:inherit}
     const d = m.today;
     const card = el("div", { class: "card" },
       el("div", { class: "who" }, el("b", {}, m.name), el("span", { class: "tag" }, `partner · ${hm(new Date().toISOString(), m.tz)} there`)),
+      el("span", { class: "bdg " + (m.postedThisWeek >= m.goalPosts && m.goalPosts ? "t" : ""), style: "justify-self:start" }, `${m.postedThisWeek}/${m.goalPosts} posts this week`),
       el("div", { class: "punch" }, el("span", { class: d.in_at ? "on" : "" }, `IN ${hm(d.in_at, m.tz)}`), el("span", { class: d.out_at ? "on" : "" }, `OUT ${hm(d.out_at, m.tz)}`)),
       counts(m, d, false));
     for (const [k, label] of [["plan", "Today's plan"], ["done", "What got done"], ["blocker", "Blocked on"]])
@@ -502,7 +510,7 @@ a{color:inherit}
     if (action === "write") toast("Writing drafts…");
     try {
       const r = await api("POST", `/feed/${itemId}/do`, { action });
-      Y = r.you; toast(r.message);
+      Y = r.you; toast(r.message); if (action === "write") youSeg = "brand";
       if (action === "todo") load();
       updateYouBadge();
     } catch (e) { toast(e.message); }
@@ -568,17 +576,105 @@ a{color:inherit}
     return [add, hint, ...list];
   }
   const PLAT = { linkedin: ["LinkedIn", "t"], x: ["X", "k"], devto: ["dev.to", "y"] };
-  function viewWriting() {
-    if (!Y.drafts.length) return [el("div", { class: "card" }, el("b", {}, "No drafts yet"), el("p", { class: "hint" }, "Tap Write about it on a feed card or on your work. You get a LinkedIn post, an X thread and a dev.to outline to edit and post."))];
-    return Y.drafts.map(d => {
-      const [label, tone] = PLAT[d.platform] || [d.platform, ""];
-      return el("div", { class: "card" },
-        el("div", { class: "row", style: "justify-content:space-between" }, el("span", { class: "bdg " + tone }, label), el("span", { class: "meta" }, new Date(d.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" }))),
-        el("pre", { class: "post" }, d.body),
-        el("div", { class: "row", style: "justify-content:space-between" },
-          el("button", { type: "button", onclick: () => youAct("DELETE", `/drafts/${d.id}`, null, "Deleted.") }, "Delete"),
-          el("button", { type: "button", class: "primary", onclick: async () => { try { await navigator.clipboard.writeText(d.body); toast("Copied."); } catch { toast("Couldn't copy. Long-press the text to copy it."); } } }, "Copy")));
-    });
+  const copy = async text => { try { await navigator.clipboard.writeText(text); return true; } catch { return false; } };
+  const openOut = url => { if (tg) tg.openLink(url); else window.open(url, "_blank", "noopener"); };
+  // First tweet of a numbered thread ("1/ …"), or the whole post.
+  const firstTweet = body => { const parts = body.split(/\n\s*\n/); return /^\s*1\s*\//.test(parts[0]) ? parts[0].replace(/^\s*1\s*\/\s*/, "") : body; };
+  async function shareTo(platform, body) {
+    const copied = await copy(body);
+    if (platform === "x") {
+      const thread = /^\s*1\s*\//.test(body);
+      openOut("https://x.com/intent/post?text=" + encodeURIComponent(firstTweet(body).slice(0, 280)));
+      toast(thread ? (copied ? "Opened X with tweet 1. The full thread is copied for the replies." : "Opened X with tweet 1.") : "Opened X.");
+    } else if (platform === "linkedin") {
+      openOut("https://www.linkedin.com/feed/?shareActive=true&text=" + encodeURIComponent(body.slice(0, 2900)));
+      toast(copied ? "Opened LinkedIn. The text is also copied, in case it doesn't fill in." : "Opened LinkedIn.");
+    } else {
+      openOut("https://dev.to/new");
+      toast(copied ? "Opened dev.to. Your outline is copied; paste it in." : "Opened dev.to.");
+    }
+  }
+  const postingNow = {};
+  function draftCard(d) {
+    const [label, tone] = PLAT[d.platform] || [d.platform, ""];
+    const ta = el("textarea", { rows: String(Math.min(12, Math.max(4, d.body.split("\n").length + 1))), maxlength: "6000" });
+    ta.value = d.body;
+    ta.addEventListener("change", () => { d.body = ta.value; api("PATCH", `/drafts/${d.id}`, { body: ta.value }).then(r => { Y = r; }).catch(e => toast(e.message)); });
+    const markForm = postingNow[d.id] ? (() => {
+      const f = el("form", { class: "row" },
+        el("input", { class: "grow", type: "url", name: "url", placeholder: "Link to the post (optional)", style: "flex:1" }),
+        el("button", { class: "primary", type: "submit" }, "Done"));
+      f.addEventListener("submit", e => { e.preventDefault(); delete postingNow[d.id]; haptic("medium"); youAct("POST", `/drafts/${d.id}/posted`, { url: new FormData(f).get("url") }); });
+      return f;
+    })() : null;
+    return el("div", { class: "card" },
+      el("div", { class: "row", style: "justify-content:space-between" }, el("span", { class: "bdg " + tone }, label), el("span", { class: "meta" }, new Date(d.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" }))),
+      ta,
+      el("div", { class: "dorow" },
+        el("button", { type: "button", class: "go", onclick: () => shareTo(d.platform, ta.value) }, d.platform === "x" ? "Post on X" : d.platform === "linkedin" ? "Post on LinkedIn" : "Open dev.to"),
+        d.platform !== "x" ? el("button", { type: "button", onclick: () => shareTo("x", ta.value) }, "X") : null,
+        d.platform !== "linkedin" ? el("button", { type: "button", onclick: () => shareTo("linkedin", ta.value) }, "LinkedIn") : null,
+        el("button", { type: "button", onclick: async () => toast((await copy(ta.value)) ? "Copied." : "Couldn't copy. Long-press to copy.") }, "Copy"),
+        el("button", { type: "button", onclick: () => { postingNow[d.id] = true; render(); } }, "Mark posted"),
+        el("button", { type: "button", onclick: () => youAct("DELETE", `/drafts/${d.id}`, null, "Deleted.") }, "Delete")),
+      markForm);
+  }
+  function viewBrand() {
+    const B = Y.brand || { ideas: [], check: null, goal: 3, postedThisWeek: 0, partnerPosts: [] };
+    const pct = B.goal ? Math.min(100, Math.round((B.postedThisWeek / B.goal) * 100)) : 0;
+    const out = [];
+    out.push(el("div", { class: "card me" },
+      el("div", { class: "row", style: "justify-content:space-between;align-items:flex-end" },
+        el("div", {}, el("div", { class: "eyebrow" }, "Posts this week"), el("div", { class: "big" }, `${B.postedThisWeek}`, el("small", {}, ` / ${B.goal}`))),
+        el("span", { class: "bdg " + (B.postedThisWeek >= B.goal && B.goal ? "t" : "y") }, B.postedThisWeek >= B.goal && B.goal ? "Goal hit" : `${Math.max(0, B.goal - B.postedThisWeek)} to go`)),
+      el("div", { class: "bar" }, el("i", { style: `width:${pct}%` })),
+      el("p", { class: "hint" }, "Showing up in public is half of getting hired. Post, then mark it posted so your partner can boost it.")));
+    if (B.partnerPosts && B.partnerPosts.length) {
+      out.push(el("div", { class: "card" }, el("h2", {}, "Boost your partner"), el("p", { class: "hint" }, "A like or a thoughtful reply in the first hour helps a post travel."),
+        B.partnerPosts.map(p => el("div", { class: "todo" },
+          el("span", { class: "bdg " + ((PLAT[p.platform] || [])[1] || "") }, (PLAT[p.platform] || [p.platform])[0]),
+          el("div", { class: "txt" }, p.preview, el("div", { class: "meta" }, `${nameOf(p.member)} · ${new Date(p.at).toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}`)),
+          safeUrl(p.url) ? el("button", { type: "button", class: "go", style: "min-height:34px;padding:4px 10px", onclick: () => openOut(p.url) }, "Open") : null))));
+    }
+    const ideasCard = el("div", { class: "card" },
+      el("div", { class: "row", style: "justify-content:space-between" }, el("h2", {}, "Post ideas"),
+        el("button", { type: "button", class: "slim go", disabled: !Y.ai, onclick: () => { toast("Reading your week…"); youAct("POST", "/brand/ideas"); } }, B.ideas.length ? "New ideas" : "Ideas from my week")),
+      B.ideas.length ? null : el("p", { class: "hint" }, "Ideas come from your own week: your plans, what got done, what was hard, and what you built. Fill in your Today card for better ones."),
+      B.ideas.map((idea, i) => el("div", { class: "todo", style: "flex-direction:column;gap:6px" },
+        el("b", {}, idea.hook), idea.angle ? el("div", {}, idea.angle) : null,
+        idea.from ? el("div", { class: "meta" }, `From: ${idea.from}`) : null,
+        el("div", { class: "dorow" },
+          el("button", { type: "button", class: idea.platform === "x" ? "go" : "", onclick: () => { toast("Drafting…"); youAct("POST", `/brand/ideas/${i}/draft`, { platform: "x" }); } }, "Draft for X"),
+          el("button", { type: "button", class: idea.platform === "linkedin" ? "go" : "", onclick: () => { toast("Drafting…"); youAct("POST", `/brand/ideas/${i}/draft`, { platform: "linkedin" }); } }, "Draft for LinkedIn")))));
+    out.push(ideasCard);
+    const queue = Y.drafts.filter(d => d.status !== "posted");
+    out.push(el("h2", { style: "font-size:20px" }, `Ready to post (${queue.length})`));
+    out.push((() => {
+      const f = el("details", { class: "card" }, el("summary", {}, "Write my own"),
+        el("form", { style: "display:grid;gap:8px;margin-top:10px" },
+          el("select", { name: "platform" }, el("option", { value: "x" }, "X"), el("option", { value: "linkedin" }, "LinkedIn"), el("option", { value: "devto" }, "dev.to")),
+          el("textarea", { name: "body", rows: "4", maxlength: "6000", placeholder: "Shipped the resume generator for Abro today. The hard part was…" }),
+          el("div", { class: "row", style: "justify-content:flex-end" }, el("button", { class: "primary", type: "submit" }, "Add to queue"))));
+      f.querySelector("form").addEventListener("submit", e => { e.preventDefault(); const d = new FormData(e.target); youAct("POST", "/drafts", { platform: d.get("platform"), body: d.get("body") }, "Queued."); });
+      return f;
+    })());
+    out.push(...(queue.length ? queue.map(draftCard) : [el("p", { class: "hint" }, "Nothing queued. Draft from an idea above, or tap Write about it on a feed card or your work.")]));
+    const posted = Y.drafts.filter(d => d.status === "posted");
+    if (posted.length) out.push(el("details", { class: "card" }, el("summary", {}, `Posted (${posted.length})`),
+      posted.map(d => el("div", { class: "todo done" },
+        el("span", { class: "bdg " + ((PLAT[d.platform] || [])[1] || "") }, (PLAT[d.platform] || [d.platform])[0]),
+        el("div", { class: "txt" }, d.body.split("\n")[0].slice(0, 120), el("div", { class: "meta" }, new Date(d.posted_at).toLocaleDateString(undefined, { day: "numeric", month: "short" }))),
+        safeUrl(d.posted_url) ? el("button", { type: "button", style: "min-height:34px;padding:4px 10px", onclick: () => openOut(d.posted_url) }, "Open") : el("button", { type: "button", style: "min-height:34px;padding:4px 10px", onclick: () => youAct("POST", `/drafts/${d.id}/posted`, { posted: false }) }, "Undo")))));
+    const C = B.check;
+    const field = (label, text) => text ? el("div", { class: "field" }, el("span", {}, label), el("pre", { class: "post" }, text),
+      el("div", {}, el("button", { type: "button", class: "slim", onclick: async () => toast((await copy(text)) ? "Copied." : "Couldn't copy.") }, "Copy"))) : null;
+    out.push(el("div", { class: "card" },
+      el("div", { class: "row", style: "justify-content:space-between" }, el("h2", {}, "Profile check"),
+        el("button", { type: "button", class: "slim", disabled: !Y.ai, onclick: () => { toast("Checking your profiles…"); youAct("POST", "/brand/check"); } }, C ? "Check again" : "Check my profiles")),
+      C ? [field("X bio", C.xBio), field("LinkedIn headline", C.linkedinHeadline), field("LinkedIn About", C.linkedinAbout), field("Post to pin on X", C.pinnedPost),
+        C.tips && C.tips.length ? el("div", { class: "field" }, el("span", {}, "Fix this week"), el("ol", { class: "deal" }, C.tips.map(t => el("li", {}, t)))) : null]
+        : el("p", { class: "hint" }, "Rewrites your X bio, LinkedIn headline and About from your focus, profile and real work, plus what to fix first.")));
+    return out;
   }
   // Profile <-> plain-text blocks, so it's quick to edit on a phone.
   const expToText = xs => (xs || []).map(e => [[e.title, e.org, e.when].filter(Boolean).join(" | "), ...(e.bullets || []).map(b => "- " + b), ...(e.summary && !(e.bullets || []).length ? [e.summary] : [])].join("\n")).join("\n\n");
@@ -657,10 +753,10 @@ a{color:inherit}
   function viewYou() {
     if (!Y) { loadYou(); return [el("p", { class: "hint" }, "Loading…")]; }
     if (Y.error) return [el("div", { class: "card" }, el("b", {}, "This didn't load"), el("p", { class: "hint" }, Y.error))];
-    const seg = el("div", { class: "seg" }, [["work", "Work"], ["writing", "Writing"], ["resume", "Resume"]].map(([k, label]) =>
-      el("button", { type: "button", class: youSeg === k ? "on" : "", onclick: () => { youSeg = k; render(); } }, label)));
+    const seg = el("div", { class: "seg" }, [["work", "Work"], ["brand", "Brand"], ["resume", "Resume"]].map(([k, label]) =>
+      el("button", { type: "button", class: youSeg === k ? "on" : "", onclick: () => { youSeg = k; render(); setTitle(); } }, label)));
     const ai = !Y.ai ? el("p", { class: "hint" }, "No AI key on the server yet, so writing drafts and the resume generator are off.") : null;
-    return [seg, ai, ...({ work: viewWork, writing: viewWriting, resume: viewResume }[youSeg] || viewWork)()];
+    return [seg, ai, ...({ work: viewWork, brand: viewBrand, resume: viewResume }[youSeg] || viewWork)()];
   }
 
   // ---- Setup ---------------------------------------------------------------
@@ -668,12 +764,13 @@ a{color:inherit}
     const m = me(), s = S.session;
     const goals = el("form", { class: "card" }, el("h2", {}, "My daily minimums"),
       el("div", { class: "goalrow" }, COUNTS.map(([k, label]) => el("label", { class: "field" }, el("span", {}, label), el("input", { id: "g-" + k, type: "number", min: "0", max: "50", value: String(m.goals[k]) })))),
+      el("label", { class: "field" }, el("span", {}, "Posts per week (X, LinkedIn, dev.to)"), el("input", { id: "g-posts", type: "number", min: "0", max: "21", value: String(m.goalPosts ?? 3) })),
       el("label", { class: "field" }, el("span", {}, "My time zone"), el("input", { id: "g-tz", value: m.tz, placeholder: "Asia/Shanghai" })),
       el("label", { class: "field" }, el("span", {}, "What I'm working toward (the feed uses this)"), (() => { const t = el("textarea", { id: "g-focus", maxlength: "500", rows: "3", placeholder: "Frontend roles, React + TypeScript. Want more backend and testing skills." }); t.value = m.focus || ""; return t; })()),
       el("div", { class: "row", style: "justify-content:flex-end" }, el("button", { class: "primary", type: "submit" }, "Save")));
     goals.addEventListener("submit", async e => {
       e.preventDefault();
-      const body = { goals: Object.fromEntries(COUNTS.map(([k]) => [k, Number($("#g-" + k).value) || 0])), tz: $("#g-tz").value.trim(), focus: $("#g-focus").value.trim() };
+      const body = { goals: Object.fromEntries(COUNTS.map(([k]) => [k, Number($("#g-" + k).value) || 0])), tz: $("#g-tz").value.trim(), focus: $("#g-focus").value.trim(), goalPosts: Number($("#g-posts").value) || 0 };
       if (await act("POST", "/me", body)) toast("Saved.");
     });
     const sess = el("form", { class: "card" }, el("h2", {}, "Live sessions"),

@@ -9,7 +9,7 @@ import { aiReady } from "./ai";
 import { tick } from "./reminders";
 import * as W from "./workActions";
 import { portfolio } from "./portfolio";
-import { Profile, drafts, emptyProfile, portfolioLinks, profiles, resumes, works } from "./work";
+import { Profile, brand, drafts, emptyProfile, portfolioLinks, profiles, resumes, works } from "./work";
 import { convertTime, dayKey, lastDays, validTz } from "./time";
 import { addTodo, bump, clockIn, clockOut, shareLead } from "./actions";
 import { botUsername } from "./notify";
@@ -69,7 +69,7 @@ async function state(me: Member) {
       const week = lastDays(m.tz, 7);
       const byDate = new Map((await days.since(m.id, week[0])).map(d => [d.date, d]));
       return {
-        id: m.id, name: m.name, username: m.username, tz: m.tz, goals: goalsOf(m), focus: m.focus,
+        id: m.id, name: m.name, username: m.username, tz: m.tz, goals: goalsOf(m), focus: m.focus, goalPosts: m.goal_posts, postedThisWeek: await W.postsThisWeek(m.id),
         date, today: await days.get(m.id, date),
         week: week.map(d => ({ date: d, day: byDate.get(d) ?? null })),
       };
@@ -182,6 +182,7 @@ export function createServer(bot?: Bot<any> | null) {
     const g = req.body?.goals;
     if (g && typeof g === "object") await members.setGoals(req.member.id, { apps: Number(g.apps), outreach: Number(g.outreach), commits: Number(g.commits) });
     if (typeof req.body?.focus === "string") await members.setFocus(req.member.id, str(req.body.focus, 500));
+    if (req.body?.goalPosts !== undefined && Number.isFinite(Number(req.body.goalPosts))) await members.setPostGoal(req.member.id, Number(req.body.goalPosts));
     const tz = str(req.body?.tz, 64);
     if (tz) { if (!validTz(tz)) return res.status(400).json({ error: "Unknown time zone." }); await members.setTz(req.member.id, tz); }
     res.json(await fresh(req));
@@ -235,6 +236,14 @@ export function createServer(bot?: Bot<any> | null) {
       resume: r ? { data: r.data, target: r.target, generatedAt: r.generated_at, publishedAt: r.published_at } : null,
       portfolio: { url: await portfolioLinks.urlOf(m.id) },
       ai: aiReady(),
+      brand: {
+        ...(await brand.get(m.id)),
+        goal: m.goal_posts,
+        postedThisWeek: await W.postsThisWeek(m.id),
+        // What the partner posted lately, so you can boost it.
+        partnerPosts: (await drafts.postedSince(new Date(Date.now() - 7 * 86_400_000).toISOString())).filter(d => d.member !== m.id).slice(0, 6)
+          .map(d => ({ id: d.id, member: d.member, platform: d.platform, url: d.posted_url, at: d.posted_at, preview: d.body.split("\n")[0].slice(0, 140) })),
+      },
     };
   };
   const id = (req: Request) => Number(req.params.id);
@@ -278,6 +287,42 @@ export function createServer(bot?: Bot<any> | null) {
     if (!d || d.member !== req.member.id) return void res.status(404).json({ error: "That draft is gone." });
     await drafts.remove(d.id); res.json(await you(req.member));
   }));
+
+  // ---- Brand ----
+  api.post("/drafts", act(async (req, res) => {
+    const platform = ["x", "linkedin", "devto"].includes(req.body?.platform) ? req.body.platform : "x";
+    const body = str(req.body?.body, 6000);
+    if (!body) return void res.status(400).json({ error: "Write something first." });
+    await drafts.add(req.member.id, { platform, body });
+    res.json(await you(req.member));
+  }));
+  api.patch("/drafts/:id", act(async (req, res) => {
+    const d = await drafts.get(id(req));
+    if (!d || d.member !== req.member.id) return void res.status(404).json({ error: "That draft is gone." });
+    await drafts.setBody(d.id, str(req.body?.body, 6000)); res.json(await you(req.member));
+  }));
+  api.post("/drafts/:id/posted", act(async (req, res) => {
+    if (req.body?.posted === false) {
+      const d = await drafts.get(id(req));
+      if (!d || d.member !== req.member.id) return void res.status(404).json({ error: "That draft is gone." });
+      await drafts.unmarkPosted(d.id); return void res.json(await you(req.member));
+    }
+    await W.markPosted(req.member, id(req), LINK(req.body?.url));
+    res.json({ message: "Marked posted. Your partner got the link.", you: await you(req.member) });
+  }));
+  api.post("/brand/ideas", act(async (req, res) => {
+    const last = Number((await kv.get(`brand:lastIdeas:${req.member.id}`)) ?? 0);
+    if (Date.now() - last < 10 * 60_000) return void res.status(429).json({ error: "You made ideas a few minutes ago. Try again in a bit." });
+    await kv.set(`brand:lastIdeas:${req.member.id}`, String(Date.now()));
+    const n = await W.brandIdeas(req.member);
+    res.json({ message: `${n} post ideas from your week.`, you: await you(req.member) });
+  }));
+  api.post("/brand/ideas/:id/draft", act(async (req, res) => {
+    const platform = ["x", "linkedin", "devto"].includes(req.body?.platform) ? req.body.platform : "x";
+    await W.draftIdea(req.member, id(req), platform);
+    res.json({ message: "Drafted. It's in your queue below.", you: await you(req.member) });
+  }));
+  api.post("/brand/check", act(async (req, res) => { await W.runProfileCheck(req.member); res.json({ message: "Profile check ready.", you: await you(req.member) }); }));
 
   api.put("/profile", act(async (req, res) => {
     const b = (req.body?.profile ?? {}) as Partial<Profile>;

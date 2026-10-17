@@ -89,6 +89,10 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS resumes (member BIGINT PRIMARY KEY, data TEXT NOT NULL, target TEXT NOT NULL DEFAULT '', generated_at TEXT NOT NULL, published_at TEXT)`,
   `CREATE TABLE IF NOT EXISTS portfolio_links (member BIGINT PRIMARY KEY, url TEXT NOT NULL, key_enc TEXT NOT NULL)`,
   `ALTER TABLE feed_items ADD COLUMN IF NOT EXISTS origin TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE drafts ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'draft'`, // draft | posted
+  `ALTER TABLE drafts ADD COLUMN IF NOT EXISTS posted_url TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE drafts ADD COLUMN IF NOT EXISTS posted_at TEXT`,
+  `ALTER TABLE members ADD COLUMN IF NOT EXISTS goal_posts INTEGER NOT NULL DEFAULT 3`, // posts per week
   `CREATE TABLE IF NOT EXISTS feed_saves (
     item INTEGER NOT NULL,
     member BIGINT NOT NULL,

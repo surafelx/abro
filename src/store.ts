@@ -6,7 +6,7 @@ import { one, q } from "./db";
 
 const now = () => new Date().toISOString();
 
-export type Member = { id: number; name: string; username: string | null; tz: string; goal_apps: number; goal_outreach: number; goal_commits: number; joined_at: string; focus: string };
+export type Member = { id: number; name: string; username: string | null; tz: string; goal_apps: number; goal_outreach: number; goal_commits: number; joined_at: string; focus: string; goal_posts: number };
 export type Day = { member: number; date: string; apps: number; outreach: number; commits: number; plan: string; done: string; blocker: string; in_at: string | null; out_at: string | null };
 export type Todo = { id: number; owner: number; text: string; created_by: number; created_at: string; done_at: string | null; done_by: number | null };
 
@@ -30,6 +30,7 @@ export const members = {
       [v("apps", cur.goal_apps), v("outreach", cur.goal_outreach), v("commits", cur.goal_commits), id]);
   },
   setTz: (id: number, tz: string) => q("UPDATE members SET tz = $1 WHERE id = $2", [tz, id]),
+  setPostGoal: (id: number, n: number) => q("UPDATE members SET goal_posts = $1 WHERE id = $2", [Math.max(0, Math.min(21, Math.round(n))), id]),
   setFocus: (id: number, focus: string) => q("UPDATE members SET focus = $1 WHERE id = $2", [focus.slice(0, 500), id]),
 };
 

@@ -2,6 +2,7 @@ import type { Bot } from "grammy";
 import { env } from "./env";
 import { COUNT_KEYS, COUNT_LABEL, Member, days, goalsOf, groupChatId, hitAll, members, todos } from "./store";
 import { clock, dayKey, lastDays } from "./time";
+import { q } from "./db";
 
 let bot: Bot | null = null;
 export const setBot = (b: Bot | null) => { bot = b; };
@@ -48,7 +49,8 @@ export async function cardText(m: Member) {
   if (d.plan) lines.push(`<i>Plan:</i> ${esc(d.plan)}`);
   if (d.done) lines.push(`<i>Done:</i> ${esc(d.done)}`);
   if (d.blocker) lines.push(`<i>Blocked:</i> ${esc(d.blocker)}`);
-  lines.push(`${open} open todo${open === 1 ? "" : "s"}`);
+  const posted = Number((await q<{ n: number }>("SELECT COUNT(*)::int AS n FROM drafts WHERE member = $1 AND status = 'posted' AND posted_at >= $2", [m.id, new Date(Date.now() - 7 * 86_400_000).toISOString()]))[0]?.n ?? 0);
+  lines.push(`${open} open todo${open === 1 ? "" : "s"} · ${posted}/${m.goal_posts} posts this week`);
   return lines.join("\n");
 }
 

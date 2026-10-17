@@ -14,7 +14,7 @@ export type Work = {
   links: string; status: "doing" | "done"; feed_item: number | null; portfolio_state: "none" | "draft" | "live";
   portfolio_url: string; in_resume: boolean; created_at: string; updated_at: string;
 };
-export type Draft = { id: number; member: number; work: number | null; feed_item: number | null; platform: string; body: string; created_at: string };
+export type Draft = { id: number; member: number; work: number | null; feed_item: number | null; platform: string; body: string; created_at: string; status: "draft" | "posted"; posted_url: string; posted_at: string | null };
 
 export const works = {
   list: (member: number) => q<Work>("SELECT * FROM works WHERE member = $1 ORDER BY status = 'done', id DESC", [member]),
@@ -51,6 +51,25 @@ export const drafts = {
     await q("INSERT INTO drafts (member, work, feed_item, platform, body, created_at) VALUES ($1,$2,$3,$4,$5,$6)", [member, d.work ?? null, d.feedItem ?? null, d.platform, d.body.slice(0, 6000), now()]);
   },
   remove: (id: number) => q("DELETE FROM drafts WHERE id = $1", [id]),
+  setBody: (id: number, body: string) => q("UPDATE drafts SET body = $1 WHERE id = $2", [body.slice(0, 6000), id]),
+  markPosted: (id: number, url: string) => q("UPDATE drafts SET status = 'posted', posted_url = $1, posted_at = $2 WHERE id = $3", [url.slice(0, 600), now(), id]),
+  unmarkPosted: (id: number) => q("UPDATE drafts SET status = 'draft', posted_url = '', posted_at = NULL WHERE id = $1", [id]),
+  /** Posts marked posted since `sinceIso` (anyone, newest first). */
+  postedSince: (sinceIso: string) => q<Draft>("SELECT * FROM drafts WHERE status = 'posted' AND posted_at >= $1 ORDER BY posted_at DESC", [sinceIso]),
+};
+
+// ---- Brand: post ideas and the profile check, kept per person -------------------
+export type PostIdea = { hook: string; angle: string; platform: string; from: string };
+export type ProfileCheck = { xBio: string; linkedinHeadline: string; linkedinAbout: string; pinnedPost: string; tips: string[]; at: string };
+export const brand = {
+  async get(member: number): Promise<{ ideas: PostIdea[]; check: ProfileCheck | null }> {
+    const r = await one<{ value: string }>("SELECT value FROM kv WHERE key = $1", [`brand:${member}`]);
+    try { return { ideas: [], check: null, ...(r ? JSON.parse(r.value) : {}) }; } catch { return { ideas: [], check: null }; }
+  },
+  async set(member: number, patch: Partial<{ ideas: PostIdea[]; check: ProfileCheck | null }>) {
+    const cur = await brand.get(member);
+    await q("INSERT INTO kv (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value", [`brand:${member}`, JSON.stringify({ ...cur, ...patch })]);
+  },
 };
 
 // ---- Resume data ---------------------------------------------------------------
