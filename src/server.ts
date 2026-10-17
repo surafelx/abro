@@ -5,7 +5,8 @@ import { Bot, webhookCallback } from "grammy";
 import { env } from "./env";
 import { COUNT_KEYS, CountKey, Member, TEXT_KEYS, TextKey, canTouchTodo, days, goalsOf, kv, leadStatus, members, session, todos } from "./store";
 import { buildDaily, buildSparks, feed } from "./feed";
-import { aiReady } from "./ai";
+import { aiReady, testAi } from "./ai";
+import { describeSettings, saveSetting, SETTINGS } from "./settings";
 import { tick } from "./reminders";
 import * as W from "./workActions";
 import { portfolio } from "./portfolio";
@@ -51,6 +52,9 @@ async function auth(req: Request, res: Response, next: NextFunction) {
   } catch (e) { console.error(e); res.status(500).json({ error: "Something went wrong on the server." }); }
 }
 
+/** The admin manages keys. In local dev (DEV_USER_ID) the dev user counts as admin. */
+const isAdmin = (m: Member) => m.id === env.adminId || (Boolean(env.devUserId) && m.id === env.devUserId);
+
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
 async function state(me: Member) {
@@ -76,6 +80,7 @@ async function state(me: Member) {
     })),
     todos: await todos.board(),
     leads, leadsError, apleo: apleoReady(),
+    admin: isAdmin(me),
     session: { ...s, tz: env.defaultTz, local: s.time ? convertTime(s.time, env.defaultTz, me.tz) : null },
   };
 }
@@ -286,6 +291,27 @@ export function createServer(bot?: Bot<any> | null) {
     const d = await drafts.get(id(req));
     if (!d || d.member !== req.member.id) return void res.status(404).json({ error: "That draft is gone." });
     await drafts.remove(d.id); res.json(await you(req.member));
+  }));
+
+  // ---- Keys & services (admin only) ----
+  const adminOnly = (fn: (req: AReq, res: Response) => Promise<unknown>) => act(async (req, res) => {
+    if (!isAdmin(req.member)) return void res.status(403).json({ error: "Only the admin can change keys." });
+    await fn(req, res);
+  });
+  api.get("/settings", adminOnly(async (_req, res) => res.json({ settings: describeSettings(), encryption: Boolean(env.encryptionKey) })));
+  api.put("/settings/:name", adminOnly(async (req, res) => {
+    const name = String(req.params.name);
+    if (!SETTINGS.some(s => s.name === name)) return void res.status(404).json({ error: "Unknown setting." });
+    await saveSetting(name, typeof req.body?.value === "string" ? req.body.value : "");
+    res.json({ message: req.body?.value ? "Saved." : "Cleared. Using the server's value, if any.", settings: describeSettings(), encryption: Boolean(env.encryptionKey) });
+  }));
+  api.post("/settings/test/:which", adminOnly(async (req, res) => {
+    if (req.params.which === "ai") return void res.json({ result: await testAi() });
+    if (req.params.which === "apleo") {
+      try { const n = (await apleo.list(true)).length; return void res.json({ result: { apleo: `works (${n} lead${n === 1 ? "" : "s"})` } }); }
+      catch (e) { return void res.json({ result: { apleo: (e as Error).message } }); }
+    }
+    res.status(404).json({ error: "Unknown test." });
   }));
 
   // ---- Brand ----

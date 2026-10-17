@@ -49,6 +49,15 @@ async function openrouter({ system, prompt, temperature = 0.6 }: Ask): Promise<s
   return text;
 }
 
+/** Check each configured provider with a tiny request. Used by Setup → Keys & services. */
+export async function testAi() {
+  const ask = { system: "Answer with JSON only.", prompt: 'Return {"ok": true}.', temperature: 0 };
+  const out: { gemini: string; openrouter: string } = { gemini: "not set", openrouter: "not set" };
+  if (env.geminiKey) out.gemini = await gemini(ask).then(t => (parseJson<{ ok?: boolean }>(t).ok ? `works (${env.geminiModel})` : "answered oddly")).catch(e => (e as Error).message.slice(0, 160));
+  if (env.openrouterKey) out.openrouter = await openrouter(ask).then(t => (parseJson<{ ok?: boolean }>(t).ok ? `works (${env.openrouterModel})` : "answered oddly")).catch(e => (e as Error).message.slice(0, 160));
+  return out;
+}
+
 /** Ask for JSON. Returns the parsed object and which provider answered. */
 export async function askJson<T>(ask: Ask): Promise<{ data: T; via: "gemini" | "openrouter" }> {
   const errors: string[] = [];

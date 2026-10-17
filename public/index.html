@@ -213,7 +213,7 @@ a{color:inherit}
   const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const safeUrl = u => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : null; } catch { return null; } };
 
-  let S = null, F = null, Y = null, youSeg = "work", tab = "today", leadFilter = "open", feedFilter = "all", busy = false;
+  let S = null, F = null, Y = null, K = null, keyTests = {}, youSeg = "work", tab = "today", leadFilter = "open", feedFilter = "all", busy = false;
   try { tab = sessionStorage.getItem("abro-tab") || "today"; } catch {}
   if (!["today", "feed", "leads", "todos", "you", "setup"].includes(tab)) tab = "today";
 
@@ -759,6 +759,50 @@ a{color:inherit}
     return [seg, ai, ...({ work: viewWork, brand: viewBrand, resume: viewResume }[youSeg] || viewWork)()];
   }
 
+  // ---- Keys & services (admin) --------------------------------------------
+  async function loadKeys() { try { K = await api("GET", "/settings"); } catch (e) { K = { error: e.message }; } if (tab === "setup") render(); }
+  const SRC = { app: ["Set in app", "t"], server: ["From server", "k"], default: ["Default", ""], none: ["Not set", "y"] };
+  function keysCard() {
+    if (!S.admin) return null;
+    if (!K) { loadKeys(); return el("div", { class: "card" }, el("h2", {}, "Keys & services"), el("p", { class: "hint" }, "Loading…")); }
+    if (K.error) return el("div", { class: "card" }, el("h2", {}, "Keys & services"), el("p", { class: "hint" }, K.error));
+    const save = async (name, value) => {
+      try { K = await api("PUT", `/settings/${name}`, { value }); toast(value ? "Saved." : "Cleared."); render(); if (name.startsWith("APLEO")) load(); }
+      catch (e) { toast(e.message); }
+    };
+    const test = async which => {
+      keyTests[which] = "Testing…"; render();
+      try { const r = await api("POST", `/settings/test/${which}`); keyTests[which] = Object.entries(r.result).map(([k, v]) => `${k}: ${v}`).join(" · "); }
+      catch (e) { keyTests[which] = e.message; }
+      render();
+    };
+    const row = k => {
+      const [label, tone] = SRC[k.source] || [k.source, ""];
+      const f = el("form", { class: "row", style: "gap:6px" },
+        el("input", { class: "grow", style: "flex:1", name: "v", type: k.secret ? "password" : "text", autocomplete: "off", placeholder: k.set ? (k.secret ? "Enter a new value to replace it" : k.preview) : k.placeholder }),
+        el("button", { type: "submit", class: "slim go" }, "Save"),
+        k.source === "app" ? el("button", { type: "button", class: "slim", onclick: () => save(k.name, "") }, "Clear") : null);
+      f.addEventListener("submit", e => { e.preventDefault(); const v = new FormData(f).get("v").trim(); if (!v) return toast("Type a value first, or tap Clear."); save(k.name, v); });
+      return el("div", { class: "field", style: "gap:6px;padding:10px 0;border-bottom:2px solid var(--stroke)" },
+        el("div", { class: "row", style: "justify-content:space-between" }, el("b", {}, k.label), el("span", { class: "bdg " + tone }, label)),
+        k.preview ? el("code", { class: "meta", style: "overflow-wrap:anywhere" }, k.preview) : null,
+        f);
+    };
+    const group = (name, which, testLabel) => [
+      el("div", { class: "row", style: "justify-content:space-between;margin-top:6px" }, el("span", { class: "eyebrow" }, name),
+        el("button", { type: "button", class: "slim", onclick: () => test(which) }, testLabel)),
+      keyTests[which] ? el("p", { class: "hint", style: "overflow-wrap:anywhere" }, keyTests[which]) : null,
+      K.settings.filter(k => k.group === name).map(row),
+    ];
+    return el("div", { class: "card" },
+      el("h2", {}, "Keys & services"),
+      el("p", { class: "hint" }, "Only you see this. Keys are stored encrypted and replace the server's values. Clear one to fall back to the server's."),
+      !K.encryption ? el("p", { class: "hint", style: "color:var(--magenta)" }, "ENCRYPTION_KEY isn't set on the server, so secret keys can't be saved here yet.") : null,
+      group("AI", "ai", "Test AI"),
+      group("Apleo", "apleo", "Test Apleo"),
+      el("p", { class: "hint" }, "The bot token, database and encryption key stay on the host (Render), since Abro needs them before it can start."));
+  }
+
   // ---- Setup ---------------------------------------------------------------
   function viewSetup() {
     const m = me(), s = S.session;
@@ -798,7 +842,7 @@ a{color:inherit}
         el("button", { class: "primary", type: "submit" }, "Save and test")));
     port.addEventListener("submit", e => { e.preventDefault(); toast("Testing the link…"); youAct("PUT", "/portfolio", { url: $("#p-url").value.trim(), key: $("#p-key").value.trim() }); });
     if (!Y) loadYou();
-    return [goals, port, sess, rules];
+    return [goals, port, keysCard(), sess, rules];
   }
 
   load().then(loadFeed).then(loadYou);

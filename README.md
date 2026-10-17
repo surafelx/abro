@@ -16,6 +16,8 @@ A two-person accountability board: clock in, hit your daily minimums, share job 
 - **Portfolio API** (`docs/PORTFOLIO_API.md`): each person links their own site in Setup (address + key; the key is encrypted with `ENCRYPTION_KEY`). Any site that implements the contract works. Surafel's portfolio26 implements it at `/api/abro`.
 - **Reminders** (`src/reminders.ts`): a "clock in" DM at `NUDGE_AT` in each person's time zone, a nightly recap at `RECAP_AT`, and a heads-up 15 minutes before a live session.
 
+**Keys from the app:** Setup → **Keys & services** (admin only) lets you set or replace the Gemini and OpenRouter keys and models, and Apleo's address and key, and test them. Values are encrypted with `ENCRYPTION_KEY` and override the host's env vars; clearing one falls back to the env var. `BOT_TOKEN`, `DATABASE_URL`, `ENCRYPTION_KEY` and `ADMIN_USER_ID` stay on the host.
+
 ## Where data lives
 
 | What | Where |

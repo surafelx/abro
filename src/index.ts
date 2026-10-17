@@ -7,8 +7,12 @@ import { setBot } from "./notify";
 import { members } from "./store";
 import { apleoReady } from "./apleo";
 import { aiReady } from "./ai";
+import { loadSettings, onSettingsChange } from "./settings";
+import { clearApleoCache } from "./apleo";
 
 await connectDb();
+await loadSettings();
+onSettingsChange(clearApleoCache);
 
 // Local browser testing: make sure the dev member exists.
 if (env.devUserId && !(await members.get(env.devUserId))) await members.upsert(env.devUserId, "Dev user");

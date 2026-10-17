@@ -28,6 +28,8 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 let cache: { at: number; leads: Lead[] } | null = null;
 
+export const clearApleoCache = () => { cache = null; };
+
 export const apleo = {
   async list(force = false): Promise<Lead[]> {
     if (!force && cache && Date.now() - cache.at < 60_000) return cache.leads;
