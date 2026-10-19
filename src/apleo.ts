@@ -31,8 +31,12 @@ let cache: { at: number; leads: Lead[] } | null = null;
 export type Pick = {
   id: string; key: string; day: string; title: string; company: string; url: string; applyUrl: string; source: string;
   score: number; rank: number; for: string; verdict: "apply" | "maybe"; why: string; angle: string; redFlags: string[];
-  verified?: { open: boolean; location: string; checkedAt: string }; pack: string; status: "new" | "applied" | "skipped" | "published"; note: string;
+  verified?: { open: boolean; location: string; checkedAt: string }; pack: string; status: PickStatus; note: string;
 };
+export type PickStatus = "new" | "applied" | "replied" | "interview" | "offer" | "rejected" | "skipped" | "published";
+export const PICK_STATUSES: PickStatus[] = ["new", "applied", "replied", "interview", "offer", "rejected", "skipped"];
+export type Funnel = { picks: number; week: number; open: number; applied: number; replied: number; interview: number; offer: number; rejected: number; skipped: number };
+let sumCache: { at: number; key: string; data: Record<string, Funnel | null> } | null = null;
 const pickCache = new Map<string, { at: number; picks: Pick[] }>();
 
 export const clearApleoCache = () => { cache = null; pickCache.clear(); };
@@ -46,9 +50,19 @@ export const picks = {
     pickCache.set(slug, { at: Date.now(), picks: list });
     return list;
   },
-  async setStatus(id: string, slug: string, status: "new" | "applied" | "skipped") {
+  async setStatus(id: string, slug: string, status: PickStatus) {
     await call("PATCH", `/picks/${encodeURIComponent(id)}`, { for: slug, status });
     pickCache.delete(slug);
+    sumCache = null;
+  },
+  /** Funnel counts for these profiles (all time, cumulative), cached for a minute. */
+  async summary(slugs: string[]): Promise<Record<string, Funnel | null>> {
+    const key = [...slugs].sort().join(",");
+    if (!key) return {};
+    if (sumCache && sumCache.key === key && Date.now() - sumCache.at < 60_000) return sumCache.data;
+    const { summary } = await call<{ summary: Record<string, Funnel | null> }>("GET", `/picks/summary?for=${encodeURIComponent(key)}`);
+    sumCache = { at: Date.now(), key, data: summary };
+    return summary;
   },
 };
 

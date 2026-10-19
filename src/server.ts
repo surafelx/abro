@@ -13,8 +13,8 @@ import { portfolio } from "./portfolio";
 import { Profile, brand, drafts, emptyProfile, portfolioLinks, profiles, resumes, works } from "./work";
 import { convertTime, dayKey, lastDays, validTz } from "./time";
 import { addTodo, bump, clockIn, clockOut, shareLead } from "./actions";
-import { botUsername } from "./notify";
-import { apleo, apleoReady, picks as apleoPicks } from "./apleo";
+import { announce, botUsername, esc } from "./notify";
+import { PICK_STATUSES, PickStatus, apleo, apleoReady, picks as apleoPicks } from "./apleo";
 
 /** Check Telegram Mini App initData (https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app). */
 export function verifyInitData(raw: string, token: string, maxAgeSec = 86_400): { id: number } | null {
@@ -74,6 +74,13 @@ async function state(me: Member) {
   return {
     me: me.id,
     profile, picks: myPicks, picksError,
+    // Everyone's job-search funnel (counts only), keyed by member id.
+    funnel: await (async () => {
+      if (!apleoReady()) return {};
+      const bySlug = new Map(ms.map(m => [profileOf(m), m.id]).filter(([s]) => s) as [string, number][]);
+      const sum = await apleoPicks.summary([...bySlug.keys()]).catch(() => ({} as Record<string, null>));
+      return Object.fromEntries([...bySlug].map(([slug, id]) => [id, sum[slug] ?? null]));
+    })(),
     bot: botUsername(),
     members: await Promise.all(ms.map(async m => {
       const date = dayKey(m.tz);
@@ -178,11 +185,14 @@ export function createServer(bot?: Bot<any> | null) {
     const profile = profileOf(req.member);
     const s = req.body?.status;
     if (!profile) return res.status(400).json({ error: "Set your Apleo profile name in Setup first." });
-    if (!["new", "applied", "skipped"].includes(s)) return res.status(400).json({ error: "Bad status." });
+    if (!PICK_STATUSES.includes(s)) return res.status(400).json({ error: "Bad status." });
     const cur = (await apleoPicks.list(profile).catch(() => [])).find(p => p.id === String(req.params.id));
-    try { await apleoPicks.setStatus(String(req.params.id), profile, s); }
+    try { await apleoPicks.setStatus(String(req.params.id), profile, s as PickStatus); }
     catch (e) { return res.status(502).json({ error: (e as Error).message }); }
-    if (s === "applied" && cur?.status !== "applied") await bump(req.member, "apps", 1);
+    if (s === "applied" && (!cur || cur.status === "new" || cur.status === "skipped")) await bump(req.member, "apps", 1);
+    if (cur && (s === "interview" || s === "offer") && cur.status !== s) {
+      await announce(s === "offer" ? `🎉 <b>${esc(req.member.name)}</b> got an offer: ${esc(cur.title)} at ${esc(cur.company)}!` : `🎤 <b>${esc(req.member.name)}</b> has an interview: ${esc(cur.title)} at ${esc(cur.company)}. Wish them luck.`, { from: req.member.id });
+    }
     res.json(await fresh(req));
   }));
   api.post("/leads/:id/status", wrap(async (req, res) => {

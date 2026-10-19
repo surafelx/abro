@@ -2,9 +2,9 @@ import { Bot, Context, InlineKeyboard } from "grammy";
 import { env } from "./env";
 import { COUNT_LABEL, CountKey, Member, canTouchTodo, days, kv, leadStatus, members, profileOf, session, todos } from "./store";
 import { dayKey, validTz } from "./time";
-import { boardReady, cardText, esc, todayText, weekText } from "./notify";
+import { announce, boardReady, cardText, esc, todayText, weekText } from "./notify";
 import { addTodo, bump, clockIn, clockOut, shareLead } from "./actions";
-import { apleo, picks as apleoPicks, Pick } from "./apleo";
+import { apleo, picks as apleoPicks, Pick, PickStatus } from "./apleo";
 import { feed } from "./feed";
 import { sendResume, addWork } from "./workActions";
 
@@ -24,6 +24,7 @@ const HELP = `<b>Abro</b> · አብሮ · together, on the clock
 
 <b>Your picks</b> (chosen for you each morning)
 /picks · today's picks, tap Applied or Skip
+/pipeline · roles you applied to: mark replies, interviews, offers
 
 <b>Leads</b> (posted publicly on Apleo)
 /lead <i>link role @ company | why it fits</i>
@@ -85,6 +86,25 @@ async function picksView(m: Member) {
     return `<b>${i + 1}. ${esc(p.title)}</b> · ${esc(p.company)}${p.verdict === "maybe" ? " <i>(maybe)</i>" : ""}\n${esc(p.why)}${p.redFlags?.length ? `\n⚠ ${esc(p.redFlags.join(" · "))}` : ""}\n<a href="${esc(p.applyUrl || p.url)}">Apply link</a>`;
   };
   return { text: `<b>Your picks · ${esc(latest)}</b>\n\n${shown.map(line).join("\n\n")}${open.length > shown.length ? `\n\n+${open.length - shown.length} more open on the board.` : ""}`, kb };
+}
+
+const NEXT: Record<string, [PickStatus, string][]> = {
+  applied: [["replied", "Replied"], ["interview", "Interview"], ["rejected", "Rejected"]],
+  replied: [["interview", "Interview"], ["rejected", "Rejected"]],
+  interview: [["offer", "Offer 🎉"], ["rejected", "Rejected"]],
+};
+async function pipelineView(m: Member) {
+  const slug = profileOf(m);
+  if (!slug) return { text: "Set your Apleo profile on the board first (Setup → My Apleo profile).", kb: new InlineKeyboard() };
+  const live = (await apleoPicks.list(slug, true)).filter(p => p.status in NEXT).slice(0, 10);
+  if (!live.length) return { text: "Nothing in progress. When you apply to a pick, it shows up here so you can log replies and interviews.", kb: new InlineKeyboard() };
+  const kb = new InlineKeyboard();
+  const text = live.map((p, i) => {
+    for (const [s, label] of NEXT[p.status]) kb.text(`${label} ${i + 1}`, `po:${s}:${p.id}`);
+    kb.row();
+    return `<b>${i + 1}. ${esc(p.title)}</b> · ${esc(p.company)} · <i>${p.status}</i>`;
+  }).join("\n");
+  return { text: `<b>In progress</b>\n\n${text}`, kb };
 }
 
 async function leadsView(m: Member) {
@@ -232,6 +252,21 @@ export function createBot(): Bot<Ctx> | null {
     await ctx.answerCallbackQuery({ text: ctx.match[1] === "applied" ? "Marked applied (+1 application)." : "Skipped." });
     try { const v = await picksView(ctx.member!); await ctx.editMessageText(v.text, { parse_mode: "HTML", reply_markup: v.kb, link_preview_options: { is_disabled: true } }); } catch { /* unchanged */ }
   });
+  bot.command("pipeline", async ctx => {
+    try { const v = await pipelineView(ctx.member!); await reply(ctx, v.text, v.kb); }
+    catch (e) { await reply(ctx, esc((e as Error).message)); }
+  });
+  bot.callbackQuery(/^po:(replied|interview|offer|rejected):([a-f0-9]{24})$/, async ctx => {
+    const slug = profileOf(ctx.member!);
+    const cur = (await apleoPicks.list(slug).catch(() => [])).find(p => p.id === ctx.match[2]);
+    try { await apleoPicks.setStatus(ctx.match[2], slug, ctx.match[1] as PickStatus); }
+    catch (e) { return void ctx.answerCallbackQuery({ text: (e as Error).message.slice(0, 180) }); }
+    await ctx.answerCallbackQuery({ text: `Marked ${ctx.match[1]}.` });
+    if (cur && (ctx.match[1] === "interview" || ctx.match[1] === "offer")) {
+      await announce(ctx.match[1] === "offer" ? `🎉 <b>${esc(ctx.member!.name)}</b> got an offer: ${esc(cur.title)} at ${esc(cur.company)}!` : `🎤 <b>${esc(ctx.member!.name)}</b> has an interview: ${esc(cur.title)} at ${esc(cur.company)}. Wish them luck.`, { from: ctx.member!.id, sourceChat: ctx.chat?.id });
+    }
+    try { const v = await pipelineView(ctx.member!); await ctx.editMessageText(v.text, { parse_mode: "HTML", reply_markup: v.kb }); } catch { /* unchanged */ }
+  });
   bot.command("leads", async ctx => {
     try { const v = await leadsView(ctx.member!); await reply(ctx, v.text, v.kb); }
     catch (e) { await reply(ctx, esc((e as Error).message)); }
@@ -313,7 +348,7 @@ export const COMMANDS = [
   ["in", "Clock in with today's plan"], ["out", "Clock out with what got done"],
   ["app", "Log an application"], ["reach", "Log an outreach"], ["commit", "Log a commit"],
   ["todo", "Add a todo for you"], ["shared", "Add a shared todo"], ["todos", "List todos"], ["done", "Tick off a todo by number"],
-  ["picks", "Your picks from this morning"], ["lead", "Share a job lead (posts to Apleo)"], ["leads", "Open leads"],
+  ["picks", "Your picks from this morning"], ["pipeline", "Log replies, interviews and offers"], ["lead", "Share a job lead (posts to Apleo)"], ["leads", "Open leads"],
   ["feed", "Today's picks and ideas"], ["focus", "What you're working toward"], ["built", "Log something you made"], ["resume", "Get your resume (PDF + Word)"], ["today", "Both time cards"], ["week", "The 7-day grid"], ["board", "Open the full board"],
   ["plan", "Set today's plan"], ["blocked", "Say what's blocking you"],
   ["session", "When we meet"], ["goals", "Set daily minimums"], ["tz", "Set your time zone"], ["help", "All commands"],

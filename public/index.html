@@ -284,6 +284,7 @@ a{color:inherit}
     for (const m of S.members) if (m.id !== S.me) out.push(partnerCard(m));
     if (S.members.length < 2) out.push(el("div", { class: "card" }, el("b", {}, "Waiting for your team"), el("p", { class: "hint" }, `They message @${S.bot || "the bot"} and you approve them. Their cards show up here as they join.`)));
     out.push(...viewWeek());
+    out.push(...funnelCard());
     return out;
   }
   function counts(m, d, editable) {
@@ -353,15 +354,38 @@ a{color:inherit}
   }
 
   // ---- Leads ---------------------------------------------------------------
+  // ---- Team funnel (counts only; each person's picks stay private) -----------
+  function funnelCard() {
+    const rows = S.members.map(m => [m, (S.funnel || {})[m.id]]).filter(([, f]) => f);
+    if (!rows.length) return [];
+    const pct = (a, b) => b ? Math.round((a / b) * 100) + "%" : "—";
+    const head = el("tr", {}, ["Who", "Picks", "Applied", "Replied", "Interview", "Offer"].map((h, i) => el("th", { style: i ? "" : "text-align:left" }, h)));
+    const body = rows.map(([m, f]) => el("tr", {},
+      el("td", { class: "name" }, m.id === S.me ? "You" : m.name),
+      el("td", {}, String(f.picks)),
+      el("td", {}, String(f.applied)),
+      el("td", {}, `${f.replied}`, el("br"), el("span", { class: "meta" }, pct(f.replied, f.applied))),
+      el("td", {}, `${f.interview}`, el("br"), el("span", { class: "meta" }, pct(f.interview, f.applied))),
+      el("td", {}, f.offer ? el("span", { class: "bdg t" }, String(f.offer)) : "0")));
+    return [el("div", { class: "card" }, el("h2", {}, "Job search so far"),
+      el("p", { class: "hint" }, "Everyone's numbers from the morning picks. Replied and Interview are a share of Applied. The roles themselves stay private."),
+      el("div", { class: "gridwrap" }, el("table", {}, el("thead", {}, head), el("tbody", {}, body))))];
+  }
+
   // ---- Your picks (the morning triage, private to you) ----------------------
   const pickOpen = {};
+  const STAGE_NEXT = { applied: [["replied", "They replied"], ["interview", "Interview"], ["rejected", "Rejected"]], replied: [["interview", "Interview"], ["rejected", "Rejected"]], interview: [["offer", "Offer 🎉"], ["rejected", "Rejected"]] };
+  const PREV = { applied: "new", skipped: "new", replied: "applied", interview: "replied", offer: "interview", rejected: "applied" };
+  const STAGE_TOAST = { replied: "Nice, a reply.", interview: "Interview! The team has been told.", offer: "An offer! 🎉 The team has been told.", rejected: "Logged. On to the next one." };
   function picksSection() {
     if (!S.profile) return [el("div", { class: "card" }, el("h2", {}, "Your picks"),
       el("p", { class: "hint" }, "Every morning Claude checks the best new roles for each person on the team. Ask the admin to add your profile, then put its name in Setup → My Apleo profile."),
       el("div", {}, el("button", { type: "button", onclick: () => setTab("setup") }, "Open Setup")))];
     if (S.picksError) return [el("div", { class: "card" }, el("h2", {}, "Your picks"), el("p", { class: "hint" }, S.picksError))];
     const list = S.picks || [];
-    const open = list.filter(p => p.status === "new"), done = list.filter(p => p.status !== "new");
+    const open = list.filter(p => p.status === "new");
+    const live = list.filter(p => ["applied", "replied", "interview"].includes(p.status));
+    const done = list.filter(p => ["offer", "rejected", "skipped", "published"].includes(p.status));
     const latest = open[0] ? open[0].day : null;
     const head = el("div", { class: "row", style: "justify-content:space-between" }, el("h2", {}, "Your picks"),
       el("span", { class: "bdg y" }, open.length ? `${open.length} open` : "All handled"));
@@ -378,14 +402,16 @@ a{color:inherit}
         (p.redFlags || []).length ? el("p", { class: "hint" }, "⚠ " + p.redFlags.join(" · ")) : null,
         p.verified && p.verified.location ? el("p", { class: "hint" }, "Who can apply: " + p.verified.location) : null,
         el("div", { class: "dorow" },
-          st !== "applied" ? el("button", { type: "button", class: "go", onclick: () => { haptic("medium"); act("POST", `/picks/${p.id}/status`, { status: "applied" }).then(r => r && toast("Marked applied (+1 application).")); } }, "I applied") : null,
-          st !== "skipped" ? el("button", { type: "button", onclick: () => { haptic(); act("POST", `/picks/${p.id}/status`, { status: "skipped" }); } }, "Skip") : null,
-          st !== "new" ? el("button", { type: "button", onclick: () => act("POST", `/picks/${p.id}/status`, { status: "new" }) }, "Undo") : null));
+          st === "new" || st === "skipped" ? el("button", { type: "button", class: "go", onclick: () => { haptic("medium"); act("POST", `/picks/${p.id}/status`, { status: "applied" }).then(r => r && toast("Marked applied (+1 application).")); } }, "I applied") : null,
+          st === "new" ? el("button", { type: "button", onclick: () => { haptic(); act("POST", `/picks/${p.id}/status`, { status: "skipped" }); } }, "Skip") : null,
+          (STAGE_NEXT[st] || []).map(([s, label]) => el("button", { type: "button", class: s === "offer" ? "go" : "", onclick: () => { haptic("medium"); act("POST", `/picks/${p.id}/status`, { status: s }).then(r => r && toast(STAGE_TOAST[s] || "Saved.")); } }, label)),
+          st !== "new" ? el("button", { type: "button", onclick: () => act("POST", `/picks/${p.id}/status`, { status: PREV[st] || "new" }) }, "Undo") : null));
     };
     const fresh = open.filter(p => p.day === latest), older = open.filter(p => p.day !== latest);
     const out = [head, el("p", { class: "hint" }, `Checked by hand this morning: still open, who can apply, hours and pay. Only you see these.`), ...fresh.map(card)];
     if (older.length) out.push(el("details", { class: "card" }, el("summary", {}, `Earlier, still open (${older.length})`), older.map(card)));
-    if (done.length) out.push(el("details", { class: "card", open: pickOpen.done || false, ontoggle: e => { pickOpen.done = e.target.open; } }, el("summary", {}, `Applied or skipped (${done.length})`), done.map(card)));
+    if (live.length) out.push(el("h2", { style: "font-size:20px" }, `In progress (${live.length})`), ...live.map(card));
+    if (done.length) out.push(el("details", { class: "card", open: pickOpen.done || false, ontoggle: e => { pickOpen.done = e.target.open; } }, el("summary", {}, `Closed (${done.length})`), done.map(card)));
     return out;
   }
 
