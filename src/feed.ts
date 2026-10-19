@@ -1,4 +1,4 @@
-// The Feed: daily picks (news, things to learn, tools to try) chosen for the two of you,
+// The Feed: daily picks (news, things to learn, tools to try) chosen for each person on the team,
 // "fresh ideas" (original ideas made by combining what's trending with each person's focus and
 // week, each with a note on how it came up), plus on Sundays a "what to improve" note per person
 // and project ideas sized to their portfolio.
@@ -120,7 +120,7 @@ export async function buildSparks(given?: Candidate[]): Promise<number> {
   }));
   const recent = (await FI().find({ kind: "spark", created_at: { $gte: new Date(Date.now() - 30 * 86_400_000).toISOString() } }, { projection: { title: 1 } }).toArray()).map(r => r.title);
   const { data } = await askJson<{ ideas: { for: string; type: string; title: string; pitch: string; first_step: string; how: string; inspired_by: number[] }[] }>({
-    system: "You are a creative partner for two developers who are job hunting and building portfolios. You come up with original, specific ideas, never generic advice, and you're open about how you got to each one. Answer with JSON only.",
+    system: "You are a creative partner for a small team of developers who are job hunting and building portfolios. You come up with original, specific ideas, never generic advice, and you're open about how you got to each one. Answer with JSON only.",
     prompt: `People:\n${JSON.stringify(people)}\n\nWhat's moving this week (numbered):\n${cands.map((c, i) => `${i}. [${c.source}] ${c.title}${c.blurb ? ` — ${c.blurb}` : ""}`).join("\n")}\n\n` +
       (recent.length ? `Don't repeat these recent ideas: ${JSON.stringify(recent)}\n\n` : "") +
       `Come up with 3 fresh ideas, at least one for each person. Each idea must combine at least two concrete inputs: an item from the list, a person's focus, their recent plans or blockers, or a gap you notice between them. Mix the types:\n` +

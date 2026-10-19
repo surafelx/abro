@@ -42,7 +42,7 @@ export async function shareLead(m: Member, l: { title: string; company?: string;
   if (!url) throw new Error("The lead needs a link starting with https://");
   const forWho = l.forWho && (await members.get(l.forWho)) ? l.forWho : 0;
   const { lead, existing } = await apleo.share({ title: l.title, company: l.company, url, note: l.note, by: m.id, forWho, openToEthiopia: l.openToEthiopia !== false });
-  const target = forWho ? (forWho === m.id ? "for themself" : `for ${esc((await members.get(forWho))!.name)}`) : "for both of you";
+  const target = forWho ? (forWho === m.id ? "for themself" : `for ${esc((await members.get(forWho))!.name)}`) : "for the whole team";
   await announce(`💼 <b>${esc(m.name)}</b> shared a lead ${target}:\n<a href="${esc(lead.url)}">${esc(lead.title)}</a>${lead.company ? ` · ${esc(lead.company)}` : ""}${l.note ? `\n${esc(l.note)}` : ""}${existing ? "\n(Already on Apleo.)" : ""}`, { from: m.id, ...src });
   return { lead, existing };
 }

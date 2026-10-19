@@ -3,7 +3,7 @@ import path from "node:path";
 import express, { NextFunction, Request, Response } from "express";
 import { Bot, webhookCallback } from "grammy";
 import { env } from "./env";
-import { COUNT_KEYS, CountKey, Member, TEXT_KEYS, TextKey, canTouchTodo, days, goalsOf, kv, leadStatus, members, session, todos } from "./store";
+import { COUNT_KEYS, CountKey, Member, TEXT_KEYS, TextKey, canTouchTodo, days, goalsOf, kv, leadStatus, members, profileOf, session, todos } from "./store";
 import { buildDaily, buildSparks, feed } from "./feed";
 import { aiReady, testAi } from "./ai";
 import { describeSettings, saveSetting, SETTINGS } from "./settings";
@@ -14,7 +14,7 @@ import { Profile, brand, drafts, emptyProfile, portfolioLinks, profiles, resumes
 import { convertTime, dayKey, lastDays, validTz } from "./time";
 import { addTodo, bump, clockIn, clockOut, shareLead } from "./actions";
 import { botUsername } from "./notify";
-import { apleo, apleoReady } from "./apleo";
+import { apleo, apleoReady, picks as apleoPicks } from "./apleo";
 
 /** Check Telegram Mini App initData (https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app). */
 export function verifyInitData(raw: string, token: string, maxAgeSec = 86_400): { id: number } | null {
@@ -65,8 +65,15 @@ async function state(me: Member) {
     const [list, status] = await Promise.all([apleo.list(), leadStatus.all()]);
     leads = list.map(l => ({ ...l, status: status[l.id] ?? {} }));
   } catch (e) { leadsError = (e as Error).message; }
+  // This person's morning picks from Apleo (private to them).
+  const profile = profileOf(me);
+  let myPicks: unknown[] = [], picksError: string | null = null;
+  if (profile && apleoReady()) {
+    try { myPicks = await apleoPicks.list(profile); } catch (e) { picksError = (e as Error).message; }
+  }
   return {
     me: me.id,
+    profile, picks: myPicks, picksError,
     bot: botUsername(),
     members: await Promise.all(ms.map(async m => {
       const date = dayKey(m.tz);
@@ -147,7 +154,7 @@ export function createServer(bot?: Bot<any> | null) {
   }));
   api.post("/todos/:id/toggle", wrap(async (req, res) => {
     const t = await todos.get(Number(req.params.id));
-    if (!t || !canTouchTodo(t, req.member.id)) return res.status(403).json({ error: "That todo belongs to your partner." });
+    if (!t || !canTouchTodo(t, req.member.id)) return res.status(403).json({ error: "That todo belongs to a teammate." });
     await todos.toggle(t.id, req.member.id);
     res.json(await fresh(req));
   }));
@@ -164,6 +171,18 @@ export function createServer(bot?: Bot<any> | null) {
     try {
       await shareLead(req.member, { title, company: str(req.body?.company, 100), url: str(req.body?.url, 600), note: str(req.body?.note, 400), forWho: Number(req.body?.forWho) || 0, openToEthiopia: req.body?.openToEthiopia !== false });
     } catch (e) { return res.status(400).json({ error: (e as Error).message }); }
+    res.json(await fresh(req));
+  }));
+  // A morning pick: Applied / Skip / back to new. Synced to Apleo's jobPicks; Applied also logs an application.
+  api.post("/picks/:id/status", wrap(async (req, res) => {
+    const profile = profileOf(req.member);
+    const s = req.body?.status;
+    if (!profile) return res.status(400).json({ error: "Set your Apleo profile name in Setup first." });
+    if (!["new", "applied", "skipped"].includes(s)) return res.status(400).json({ error: "Bad status." });
+    const cur = (await apleoPicks.list(profile).catch(() => [])).find(p => p.id === String(req.params.id));
+    try { await apleoPicks.setStatus(String(req.params.id), profile, s); }
+    catch (e) { return res.status(502).json({ error: (e as Error).message }); }
+    if (s === "applied" && cur?.status !== "applied") await bump(req.member, "apps", 1);
     res.json(await fresh(req));
   }));
   api.post("/leads/:id/status", wrap(async (req, res) => {
@@ -187,6 +206,11 @@ export function createServer(bot?: Bot<any> | null) {
     const g = req.body?.goals;
     if (g && typeof g === "object") await members.setGoals(req.member.id, { apps: Number(g.apps), outreach: Number(g.outreach), commits: Number(g.commits) });
     if (typeof req.body?.focus === "string") await members.setFocus(req.member.id, str(req.body.focus, 500));
+    if (typeof req.body?.profile === "string") {
+      const slug = req.body.profile.trim().toLowerCase();
+      if (slug && !/^[a-z0-9-]{1,40}$/.test(slug)) return res.status(400).json({ error: "A profile name is lowercase letters, numbers and dashes, like mavis." });
+      await members.setProfile(req.member.id, slug);
+    }
     if (req.body?.goalPosts !== undefined && Number.isFinite(Number(req.body.goalPosts))) await members.setPostGoal(req.member.id, Number(req.body.goalPosts));
     const tz = str(req.body?.tz, 64);
     if (tz) { if (!validTz(tz)) return res.status(400).json({ error: "Unknown time zone." }); await members.setTz(req.member.id, tz); }
@@ -245,7 +269,7 @@ export function createServer(bot?: Bot<any> | null) {
         ...(await brand.get(m.id)),
         goal: m.goal_posts,
         postedThisWeek: await W.postsThisWeek(m.id),
-        // What the partner posted lately, so you can boost it.
+        // What teammates posted lately, so you can boost it.
         partnerPosts: (await drafts.postedSince(new Date(Date.now() - 7 * 86_400_000).toISOString())).filter(d => d.member !== m.id).slice(0, 6)
           .map(d => ({ id: d.id, member: d.member, platform: d.platform, url: d.posted_url, at: d.posted_at, preview: d.body.split("\n")[0].slice(0, 140) })),
       },
@@ -334,7 +358,7 @@ export function createServer(bot?: Bot<any> | null) {
       await drafts.unmarkPosted(d.id); return void res.json(await you(req.member));
     }
     await W.markPosted(req.member, id(req), LINK(req.body?.url));
-    res.json({ message: "Marked posted. Your partner got the link.", you: await you(req.member) });
+    res.json({ message: "Marked posted. Your team got the link.", you: await you(req.member) });
   }));
   api.post("/brand/ideas", act(async (req, res) => {
     const last = Number((await kv.get(`brand:lastIdeas:${req.member.id}`)) ?? 0);

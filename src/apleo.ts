@@ -28,7 +28,29 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 let cache: { at: number; leads: Lead[] } | null = null;
 
-export const clearApleoCache = () => { cache = null; };
+export type Pick = {
+  id: string; key: string; day: string; title: string; company: string; url: string; applyUrl: string; source: string;
+  score: number; rank: number; for: string; verdict: "apply" | "maybe"; why: string; angle: string; redFlags: string[];
+  verified?: { open: boolean; location: string; checkedAt: string }; pack: string; status: "new" | "applied" | "skipped" | "published"; note: string;
+};
+const pickCache = new Map<string, { at: number; picks: Pick[] }>();
+
+export const clearApleoCache = () => { cache = null; pickCache.clear(); };
+
+/** The morning triage's picks for one person (Apleo's jobPicks), newest day first. */
+export const picks = {
+  async list(slug: string, force = false): Promise<Pick[]> {
+    const c = pickCache.get(slug);
+    if (!force && c && Date.now() - c.at < 60_000) return c.picks;
+    const { picks: list } = await call<{ picks: Pick[] }>("GET", `/picks?for=${encodeURIComponent(slug)}&days=14`);
+    pickCache.set(slug, { at: Date.now(), picks: list });
+    return list;
+  },
+  async setStatus(id: string, slug: string, status: "new" | "applied" | "skipped") {
+    await call("PATCH", `/picks/${encodeURIComponent(id)}`, { for: slug, status });
+    pickCache.delete(slug);
+  },
+};
 
 export const apleo = {
   async list(force = false): Promise<Lead[]> {

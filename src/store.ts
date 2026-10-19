@@ -6,7 +6,7 @@ import { NO_ID, col, nextId } from "./db";
 
 const now = () => new Date().toISOString();
 
-export type Member = { id: number; name: string; username: string | null; tz: string; goal_apps: number; goal_outreach: number; goal_commits: number; joined_at: string; focus: string; goal_posts: number };
+export type Member = { id: number; name: string; username: string | null; tz: string; goal_apps: number; goal_outreach: number; goal_commits: number; joined_at: string; focus: string; goal_posts: number; profile?: string };
 export type Day = { member: number; date: string; apps: number; outreach: number; commits: number; plan: string; done: string; blocker: string; in_at: string | null; out_at: string | null };
 export type Todo = { id: number; owner: number; text: string; created_by: number; created_at: string; done_at: string | null; done_by: number | null };
 
@@ -35,8 +35,12 @@ export const members = {
   },
   setTz: (id: number, tz: string) => M().updateOne({ _id: id }, { $set: { tz } }),
   setPostGoal: (id: number, n: number) => M().updateOne({ _id: id }, { $set: { goal_posts: Math.max(0, Math.min(21, Math.round(n))) } }),
+  setProfile: (id: number, slug: string) => M().updateOne({ _id: id }, { $set: { profile: slug } }),
   setFocus: (id: number, focus: string) => M().updateOne({ _id: id }, { $set: { focus: focus.slice(0, 500) } }),
 };
+
+/** Which Apleo triage profile this member's picks are filed under. The admin is "surafel" unless set. */
+export const profileOf = (m: Member) => m.profile || (m.id === env.adminId ? "surafel" : "");
 
 export const goalsOf = (m: Member): Record<CountKey, number> => ({ apps: m.goal_apps, outreach: m.goal_outreach, commits: m.goal_commits });
 
@@ -106,7 +110,7 @@ export const todos = {
   remove: (id: number) => T().deleteOne({ _id: id }),
 };
 
-/** Members may change their own todos and shared ones; the partner's are read-only. */
+/** Members may change their own todos and shared ones; teammates' are read-only. */
 export const canTouchTodo = (t: Todo, member: number) => t.owner === 0 || t.owner === member;
 
 /** Who applied to (or skipped) which Apleo lead. */

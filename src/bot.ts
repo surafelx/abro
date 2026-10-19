@@ -1,10 +1,10 @@
 import { Bot, Context, InlineKeyboard } from "grammy";
 import { env } from "./env";
-import { COUNT_LABEL, CountKey, Member, canTouchTodo, days, kv, leadStatus, members, session, todos } from "./store";
+import { COUNT_LABEL, CountKey, Member, canTouchTodo, days, kv, leadStatus, members, profileOf, session, todos } from "./store";
 import { dayKey, validTz } from "./time";
 import { boardReady, cardText, esc, todayText, weekText } from "./notify";
 import { addTodo, bump, clockIn, clockOut, shareLead } from "./actions";
-import { apleo } from "./apleo";
+import { apleo, picks as apleoPicks, Pick } from "./apleo";
 import { feed } from "./feed";
 import { sendResume, addWork } from "./workActions";
 
@@ -18,9 +18,12 @@ const HELP = `<b>Abro</b> · አብሮ · together, on the clock
 
 <b>Todos</b>
 /todo <i>text</i> · add one for you
-/shared <i>text</i> · add one for both of you
+/shared <i>text</i> · add one for the whole team
 /todos · list them, tap to tick off
 /done <i>number</i> · tick one off by number
+
+<b>Your picks</b> (chosen for you each morning)
+/picks · today's picks, tap Applied or Skip
 
 <b>Leads</b> (posted publicly on Apleo)
 /lead <i>link role @ company | why it fits</i>
@@ -66,6 +69,22 @@ async function todosView(m: Member) {
   const kb = new InlineKeyboard();
   for (const t of [...mine, ...shared].slice(0, 24)) kb.text(`✓ ${t.text.slice(0, 28)}`, `td:${t.id}`).row();
   return { text: parts.join("\n\n"), kb };
+}
+
+async function picksView(m: Member) {
+  const slug = profileOf(m);
+  if (!slug) return { text: "You don't have picks yet. Ask the admin to add your profile, then set its name on the board (Setup → My Apleo profile).", kb: new InlineKeyboard() };
+  const all = await apleoPicks.list(slug, true);
+  const open = all.filter(p => p.status === "new");
+  if (!open.length) return { text: all.length ? "No open picks. You've handled everything from the last two weeks." : "No picks yet. They arrive after the morning run.", kb: new InlineKeyboard() };
+  const latest = open[0].day;
+  const shown = open.filter(p => p.day === latest).slice(0, 8);
+  const kb = new InlineKeyboard();
+  const line = (p: Pick, i: number) => {
+    kb.text(`Applied ${i + 1}`, `pk:applied:${p.id}`).text(`Skip ${i + 1}`, `pk:skipped:${p.id}`).row();
+    return `<b>${i + 1}. ${esc(p.title)}</b> · ${esc(p.company)}${p.verdict === "maybe" ? " <i>(maybe)</i>" : ""}\n${esc(p.why)}${p.redFlags?.length ? `\n⚠ ${esc(p.redFlags.join(" · "))}` : ""}\n<a href="${esc(p.applyUrl || p.url)}">Apply link</a>`;
+  };
+  return { text: `<b>Your picks · ${esc(latest)}</b>\n\n${shown.map(line).join("\n\n")}${open.length > shown.length ? `\n\n+${open.length - shown.length} more open on the board.` : ""}`, kb };
 }
 
 async function leadsView(m: Member) {
@@ -167,13 +186,13 @@ export function createBot(): Bot<Ctx> | null {
     const shared = ctx.message?.text?.startsWith("/shared") ?? false;
     if (!text) return void reply(ctx, `Write the todo after the command, e.g. <code>/${shared ? "shared" : "todo"} Update portfolio README</code>`);
     const id = await addTodo(ctx.member!, text, shared, src(ctx));
-    await reply(ctx, `Added <code>#${id}</code>${shared ? " for both of you" : ""}. /todos to see the list.`);
+    await reply(ctx, `Added <code>#${id}</code>${shared ? " for the whole team" : ""}. /todos to see the list.`);
   });
   bot.command("todos", async ctx => { const v = await todosView(ctx.member!); await reply(ctx, v.text, v.kb); });
   bot.command("done", async ctx => {
     const t = await todos.get(parseInt(arg(ctx).replace("#", ""), 10));
     if (!t) return void reply(ctx, "No todo with that number. /todos shows the numbers.");
-    if (!canTouchTodo(t, ctx.member!.id)) return void reply(ctx, "That one belongs to your partner.");
+    if (!canTouchTodo(t, ctx.member!.id)) return void reply(ctx, "That one belongs to a teammate.");
     if (t.done_at) return void reply(ctx, `<code>#${t.id}</code> is already done.`);
     await todos.toggle(t.id, ctx.member!.id);
     await reply(ctx, `Done: ${esc(t.text)}`);
@@ -198,6 +217,20 @@ export function createBot(): Bot<Ctx> | null {
       const { existing } = await shareLead(ctx.member!, { title, company, url, note }, src(ctx));
       await reply(ctx, existing ? "That job is already on Apleo. Added it to your leads." : "Shared. It's live on Apleo now.");
     } catch (e) { await reply(ctx, esc((e as Error).message)); }
+  });
+  bot.command("picks", async ctx => {
+    try { const v = await picksView(ctx.member!); await reply(ctx, v.text, v.kb); }
+    catch (e) { await reply(ctx, esc((e as Error).message)); }
+  });
+  bot.callbackQuery(/^pk:(applied|skipped):([a-f0-9]{24})$/, async ctx => {
+    const slug = profileOf(ctx.member!);
+    if (!slug) return void ctx.answerCallbackQuery({ text: "Set your profile on the board first." });
+    const cur = (await apleoPicks.list(slug).catch(() => [])).find(p => p.id === ctx.match[2]);
+    try { await apleoPicks.setStatus(ctx.match[2], slug, ctx.match[1] as "applied" | "skipped"); }
+    catch (e) { return void ctx.answerCallbackQuery({ text: (e as Error).message.slice(0, 180) }); }
+    if (ctx.match[1] === "applied" && cur?.status !== "applied") await bump(ctx.member!, "apps", 1, src(ctx));
+    await ctx.answerCallbackQuery({ text: ctx.match[1] === "applied" ? "Marked applied (+1 application)." : "Skipped." });
+    try { const v = await picksView(ctx.member!); await ctx.editMessageText(v.text, { parse_mode: "HTML", reply_markup: v.kb, link_preview_options: { is_disabled: true } }); } catch { /* unchanged */ }
   });
   bot.command("leads", async ctx => {
     try { const v = await leadsView(ctx.member!); await reply(ctx, v.text, v.kb); }
@@ -280,7 +313,7 @@ export const COMMANDS = [
   ["in", "Clock in with today's plan"], ["out", "Clock out with what got done"],
   ["app", "Log an application"], ["reach", "Log an outreach"], ["commit", "Log a commit"],
   ["todo", "Add a todo for you"], ["shared", "Add a shared todo"], ["todos", "List todos"], ["done", "Tick off a todo by number"],
-  ["lead", "Share a job lead (posts to Apleo)"], ["leads", "Open leads"],
+  ["picks", "Your picks from this morning"], ["lead", "Share a job lead (posts to Apleo)"], ["leads", "Open leads"],
   ["feed", "Today's picks and ideas"], ["focus", "What you're working toward"], ["built", "Log something you made"], ["resume", "Get your resume (PDF + Word)"], ["today", "Both time cards"], ["week", "The 7-day grid"], ["board", "Open the full board"],
   ["plan", "Set today's plan"], ["blocked", "Say what's blocking you"],
   ["session", "When we meet"], ["goals", "Set daily minimums"], ["tz", "Set your time zone"], ["help", "All commands"],

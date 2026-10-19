@@ -252,7 +252,7 @@ a{color:inherit}
     const sub = {
       today: `${goals}/3 goals · ${d.out_at ? "out " + hm(d.out_at, m.tz) : d.in_at ? "in " + hm(d.in_at, m.tz) : "not in yet"}`,
       feed: F ? `${F.items.filter(i => i.day === today && (i.for_member === 0 || i.for_member === S.me)).length} picks today` : "Loading…",
-      leads: `${S.leads.filter(l => !l.status[S.me] && (l.forWho === 0 || l.forWho === S.me)).length} open for you`,
+      leads: `${((n) => `${n} pick${n === 1 ? "" : "s"}`)((S.picks || []).filter(p => p.status === "new").length)} · ${S.leads.filter(l => !l.status[S.me] && (l.forWho === 0 || l.forWho === S.me)).length} shared leads`,
       todos: `${S.todos.filter(t => !t.done_at && (t.owner === S.me || t.owner === 0)).length} open`,
       you: !Y || !Y.works ? "Work, brand and resume" : youSeg === "brand" && Y.brand ? `${Y.brand.postedThisWeek}/${Y.brand.goal} posts this week` : `${Y.works.filter(w => w.status === "doing").length} doing · ${Y.works.filter(w => w.portfolio_state === "live").length} live`,
       setup: "Goals, focus, sessions, portfolio",
@@ -268,7 +268,7 @@ a{color:inherit}
     setTitle();
     const myOpen = S.todos.filter(t => !t.done_at && (t.owner === S.me || t.owner === 0)).length;
     $("#todoBadge").textContent = myOpen ? String(myOpen) : "";
-    const openLeads = S.leads.filter(l => !l.status[S.me] && (l.forWho === 0 || l.forWho === S.me) && l.by !== S.me).length;
+    const openLeads = S.leads.filter(l => !l.status[S.me] && (l.forWho === 0 || l.forWho === S.me) && l.by !== S.me).length + (S.picks || []).filter(p => p.status === "new").length;
     $("#leadBadge").textContent = openLeads ? String(openLeads) : "";
     tickClock(); updateFeedBadge();
     const view = { today: viewToday, feed: viewFeed, todos: viewTodos, leads: viewLeads, you: viewYou, setup: viewSetup }[tab] || viewToday;
@@ -282,7 +282,7 @@ a{color:inherit}
   function viewToday() {
     const out = [myCard()];
     for (const m of S.members) if (m.id !== S.me) out.push(partnerCard(m));
-    if (S.members.length < 2) out.push(el("div", { class: "card" }, el("b", {}, "Waiting for your partner"), el("p", { class: "hint" }, `They message @${S.bot || "the bot"} and you approve them. Their card shows up here.`)));
+    if (S.members.length < 2) out.push(el("div", { class: "card" }, el("b", {}, "Waiting for your team"), el("p", { class: "hint" }, `They message @${S.bot || "the bot"} and you approve them. Their cards show up here as they join.`)));
     out.push(...viewWeek());
     return out;
   }
@@ -304,7 +304,7 @@ a{color:inherit}
     const card = el("div", { class: "card me" }, el("div", { class: "who" }, el("b", {}, m.name), el("span", { class: "tag" }, "you · today")), punch, counts(m, d, true),
       el("div", { class: "row", style: "justify-content:space-between" }, el("span", { class: "bdg " + (m.postedThisWeek >= m.goalPosts && m.goalPosts ? "t" : "") }, `${m.postedThisWeek}/${m.goalPosts} posts this week`),
         el("button", { type: "button", class: "slim", onclick: () => { youSeg = "brand"; setTab("you"); } }, "Post something")));
-    for (const [k, label, ph] of [["plan", "Today's plan", "5 applications, finish the README, 1 cold email"], ["done", "What got done", "Fill in at clock-out"], ["blocker", "Blocked on", "Anything you need from your partner"]]) {
+    for (const [k, label, ph] of [["plan", "Today's plan", "5 applications, finish the README, 1 cold email"], ["done", "What got done", "Fill in at clock-out"], ["blocker", "Blocked on", "Anything you need from the team"]]) {
       const ta = el("textarea", { id: "t-" + k, maxlength: "2000", rows: k === "plan" ? "3" : "2", placeholder: ph });
       ta.value = d[k] || "";
       ta.addEventListener("input", () => { d[k] = ta.value; clearTimeout(textTimers[k]); textTimers[k] = setTimeout(() => api("POST", "/day/text", { key: k, text: ta.value }).catch(e => toast(e.message)), 600); });
@@ -315,7 +315,7 @@ a{color:inherit}
   function partnerCard(m) {
     const d = m.today;
     const card = el("div", { class: "card" },
-      el("div", { class: "who" }, el("b", {}, m.name), el("span", { class: "tag" }, `partner · ${hm(new Date().toISOString(), m.tz)} there`)),
+      el("div", { class: "who" }, el("b", {}, m.name), el("span", { class: "tag" }, `team · ${hm(new Date().toISOString(), m.tz)} there`)),
       el("span", { class: "bdg " + (m.postedThisWeek >= m.goalPosts && m.goalPosts ? "t" : ""), style: "justify-self:start" }, `${m.postedThisWeek}/${m.goalPosts} posts this week`),
       el("div", { class: "punch" }, el("span", { class: d.in_at ? "on" : "" }, `IN ${hm(d.in_at, m.tz)}`), el("span", { class: d.out_at ? "on" : "" }, `OUT ${hm(d.out_at, m.tz)}`)),
       counts(m, d, false));
@@ -329,7 +329,7 @@ a{color:inherit}
     const form = el("form", { class: "card" },
       el("label", { class: "field" }, el("span", {}, "New todo"), el("input", { id: "todoText", maxlength: "300", placeholder: "Rewrite the portfolio intro", required: true })),
       el("div", { class: "row" },
-        el("label", { class: "row grow", style: "gap:6px;font-size:14px" }, el("input", { id: "todoShared", type: "checkbox", style: "width:auto" }), "Shared with partner"),
+        el("label", { class: "row grow", style: "gap:6px;font-size:14px" }, el("input", { id: "todoShared", type: "checkbox", style: "width:auto" }), "Shared with the team"),
         el("button", { class: "primary", type: "submit" }, "Add")));
     form.addEventListener("submit", async e => {
       e.preventDefault(); const text = $("#todoText").value.trim(); if (!text) return;
@@ -353,6 +353,42 @@ a{color:inherit}
   }
 
   // ---- Leads ---------------------------------------------------------------
+  // ---- Your picks (the morning triage, private to you) ----------------------
+  const pickOpen = {};
+  function picksSection() {
+    if (!S.profile) return [el("div", { class: "card" }, el("h2", {}, "Your picks"),
+      el("p", { class: "hint" }, "Every morning Claude checks the best new roles for each person on the team. Ask the admin to add your profile, then put its name in Setup → My Apleo profile."),
+      el("div", {}, el("button", { type: "button", onclick: () => setTab("setup") }, "Open Setup")))];
+    if (S.picksError) return [el("div", { class: "card" }, el("h2", {}, "Your picks"), el("p", { class: "hint" }, S.picksError))];
+    const list = S.picks || [];
+    const open = list.filter(p => p.status === "new"), done = list.filter(p => p.status !== "new");
+    const latest = open[0] ? open[0].day : null;
+    const head = el("div", { class: "row", style: "justify-content:space-between" }, el("h2", {}, "Your picks"),
+      el("span", { class: "bdg y" }, open.length ? `${open.length} open` : "All handled"));
+    if (!list.length) return [head, el("p", { class: "hint" }, "No picks yet. They arrive after the morning run, and the bot will message you.")];
+    const card = p => {
+      const st = p.status;
+      return el("div", { class: "card lead" + (st === "applied" ? " done" : st === "skipped" ? " skip" : "") },
+        el("div", { class: "badges" }, el("span", { class: "bdg k" }, "#" + p.rank), el("span", { class: "bdg " + (p.verdict === "apply" ? "t" : "y") }, p.verdict === "apply" ? "Apply" : "Maybe"),
+          el("span", { class: "bdg" }, p.day.slice(5)), st !== "new" ? el("span", { class: "bdg m" }, st) : null),
+        el("h3", {}, el("a", { href: p.applyUrl || p.url, target: "_blank", rel: "noopener", onclick: e => { if (tg) { e.preventDefault(); tg.openLink(p.applyUrl || p.url); } } }, p.title)),
+        el("div", { class: "meta" }, p.company),
+        p.why ? el("p", {}, p.why) : null,
+        p.angle ? el("p", { class: "hint" }, "Stress: " + p.angle) : null,
+        (p.redFlags || []).length ? el("p", { class: "hint" }, "⚠ " + p.redFlags.join(" · ")) : null,
+        p.verified && p.verified.location ? el("p", { class: "hint" }, "Who can apply: " + p.verified.location) : null,
+        el("div", { class: "dorow" },
+          st !== "applied" ? el("button", { type: "button", class: "go", onclick: () => { haptic("medium"); act("POST", `/picks/${p.id}/status`, { status: "applied" }).then(r => r && toast("Marked applied (+1 application).")); } }, "I applied") : null,
+          st !== "skipped" ? el("button", { type: "button", onclick: () => { haptic(); act("POST", `/picks/${p.id}/status`, { status: "skipped" }); } }, "Skip") : null,
+          st !== "new" ? el("button", { type: "button", onclick: () => act("POST", `/picks/${p.id}/status`, { status: "new" }) }, "Undo") : null));
+    };
+    const fresh = open.filter(p => p.day === latest), older = open.filter(p => p.day !== latest);
+    const out = [head, el("p", { class: "hint" }, `Checked by hand this morning: still open, who can apply, hours and pay. Only you see these.`), ...fresh.map(card)];
+    if (older.length) out.push(el("details", { class: "card" }, el("summary", {}, `Earlier, still open (${older.length})`), older.map(card)));
+    if (done.length) out.push(el("details", { class: "card", open: pickOpen.done || false, ontoggle: e => { pickOpen.done = e.target.open; } }, el("summary", {}, `Applied or skipped (${done.length})`), done.map(card)));
+    return out;
+  }
+
   function viewLeads() {
     const others = S.members.filter(m => m.id !== S.me);
     const form = el("form", { class: "card" },
@@ -360,7 +396,7 @@ a{color:inherit}
       el("label", { class: "field" }, el("span", {}, "Role"), el("input", { id: "lTitle", maxlength: "160", required: true, placeholder: "Frontend Developer" })),
       el("label", { class: "field" }, el("span", {}, "Company"), el("input", { id: "lCompany", maxlength: "100", placeholder: "Acme" })),
       el("label", { class: "field" }, el("span", {}, "Link"), el("input", { id: "lUrl", type: "url", maxlength: "600", required: true, placeholder: "https://…" })),
-      el("label", { class: "field" }, el("span", {}, "Who it's for"), el("select", { id: "lFor" }, el("option", { value: "0" }, "Both of us"), el("option", { value: String(S.me) }, "Me"), others.map(m => el("option", { value: String(m.id) }, m.name)))),
+      el("label", { class: "field" }, el("span", {}, "Who it's for"), el("select", { id: "lFor" }, el("option", { value: "0" }, "Whole team"), el("option", { value: String(S.me) }, "Me"), others.map(m => el("option", { value: String(m.id) }, m.name)))),
       el("label", { class: "field" }, el("span", {}, "Why it fits"), el("input", { id: "lNote", maxlength: "400", placeholder: "Remote, open worldwide, React + Node" })),
       el("label", { class: "row", style: "gap:8px;font-weight:600" }, el("input", { id: "lEth", type: "checkbox", checked: true }), "Open to applicants in Ethiopia"),
       el("p", { class: "hint" }, "Shared leads go live as public job listings on Apleo."),
@@ -380,12 +416,12 @@ a{color:inherit}
     if (leadFilter === "open") list = list.filter(l => !my(l) && (l.forWho === 0 || l.forWho === S.me || l.by === S.me));
     if (leadFilter === "mine") list = list.filter(l => l.forWho === S.me || (l.forWho === 0 && l.by !== S.me));
     const cards = S.leadsError ? [el("div", { class: "card" }, el("b", {}, "Leads are offline"), el("p", { class: "hint" }, S.leadsError))]
-      : list.length ? list.map(leadCard) : [el("p", { class: "hint" }, S.leads.length ? "Nothing in this view." : "No leads yet. Share the first role you find for either of you.")];
-    return [el("div", { class: "row", style: "justify-content:flex-end" }, filters), ...cards, form];
+      : list.length ? list.map(leadCard) : [el("p", { class: "hint" }, S.leads.length ? "Nothing in this view." : "No leads yet. Share the first role you find for anyone on the team.")];
+    return [...picksSection(), el("div", { class: "row", style: "justify-content:space-between" }, el("h2", { style: "font-size:20px" }, "Shared leads"), filters), ...cards, form];
   }
   function leadCard(l) {
     const s = l.status[S.me], url = safeUrl(l.url);
-    const forTxt = l.forWho === 0 ? "for both" : l.forWho === S.me ? "for you" : `for ${nameOf(l.forWho)}`;
+    const forTxt = l.forWho === 0 ? "for the team" : l.forWho === S.me ? "for you" : `for ${nameOf(l.forWho)}`;
     const others = Object.entries(l.status).filter(([id, v]) => Number(id) !== S.me && v === "applied").map(([id]) => `${nameOf(Number(id))} applied`);
     const when = new Date(l.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short" });
     return el("div", { class: "card lead" + (s === "applied" ? " done" : s === "skip" ? " skip" : "") },
@@ -628,9 +664,9 @@ a{color:inherit}
         el("div", {}, el("div", { class: "eyebrow" }, "Posts this week"), el("div", { class: "big" }, `${B.postedThisWeek}`, el("small", {}, ` / ${B.goal}`))),
         el("span", { class: "bdg " + (B.postedThisWeek >= B.goal && B.goal ? "t" : "y") }, B.postedThisWeek >= B.goal && B.goal ? "Goal hit" : `${Math.max(0, B.goal - B.postedThisWeek)} to go`)),
       el("div", { class: "bar" }, el("i", { style: `width:${pct}%` })),
-      el("p", { class: "hint" }, "Showing up in public is half of getting hired. Post, then mark it posted so your partner can boost it.")));
+      el("p", { class: "hint" }, "Showing up in public is half of getting hired. Post, then mark it posted so your team can boost it.")));
     if (B.partnerPosts && B.partnerPosts.length) {
-      out.push(el("div", { class: "card" }, el("h2", {}, "Boost your partner"), el("p", { class: "hint" }, "A like or a thoughtful reply in the first hour helps a post travel."),
+      out.push(el("div", { class: "card" }, el("h2", {}, "Boost your team"), el("p", { class: "hint" }, "A like or a thoughtful reply in the first hour helps a post travel."),
         B.partnerPosts.map(p => el("div", { class: "todo" },
           el("span", { class: "bdg " + ((PLAT[p.platform] || [])[1] || "") }, (PLAT[p.platform] || [p.platform])[0]),
           el("div", { class: "txt" }, p.preview, el("div", { class: "meta" }, `${nameOf(p.member)} · ${new Date(p.at).toLocaleDateString(undefined, { weekday: "short", day: "numeric" })}`)),
@@ -808,13 +844,14 @@ a{color:inherit}
     const m = me(), s = S.session;
     const goals = el("form", { class: "card" }, el("h2", {}, "My daily minimums"),
       el("div", { class: "goalrow" }, COUNTS.map(([k, label]) => el("label", { class: "field" }, el("span", {}, label), el("input", { id: "g-" + k, type: "number", min: "0", max: "50", value: String(m.goals[k]) })))),
+      el("label", { class: "field" }, el("span", {}, "My Apleo profile (whose morning picks are mine)"), el("input", { id: "g-profile", value: S.profile || "", placeholder: "e.g. mavis", autocomplete: "off" })),
       el("label", { class: "field" }, el("span", {}, "Posts per week (X, LinkedIn, dev.to)"), el("input", { id: "g-posts", type: "number", min: "0", max: "21", value: String(m.goalPosts ?? 3) })),
       el("label", { class: "field" }, el("span", {}, "My time zone"), el("input", { id: "g-tz", value: m.tz, placeholder: "Asia/Shanghai" })),
       el("label", { class: "field" }, el("span", {}, "What I'm working toward (the feed uses this)"), (() => { const t = el("textarea", { id: "g-focus", maxlength: "500", rows: "3", placeholder: "Frontend roles, React + TypeScript. Want more backend and testing skills." }); t.value = m.focus || ""; return t; })()),
       el("div", { class: "row", style: "justify-content:flex-end" }, el("button", { class: "primary", type: "submit" }, "Save")));
     goals.addEventListener("submit", async e => {
       e.preventDefault();
-      const body = { goals: Object.fromEntries(COUNTS.map(([k]) => [k, Number($("#g-" + k).value) || 0])), tz: $("#g-tz").value.trim(), focus: $("#g-focus").value.trim(), goalPosts: Number($("#g-posts").value) || 0 };
+      const body = { goals: Object.fromEntries(COUNTS.map(([k]) => [k, Number($("#g-" + k).value) || 0])), tz: $("#g-tz").value.trim(), focus: $("#g-focus").value.trim(), goalPosts: Number($("#g-posts").value) || 0, profile: $("#g-profile").value.trim() };
       if (await act("POST", "/me", body)) toast("Saved.");
     });
     const sess = el("form", { class: "card" }, el("h2", {}, "Live sessions"),

@@ -1,8 +1,8 @@
 import { env } from "./env";
-import { days, kv, members, session } from "./store";
+import { days, kv, members, profileOf, session } from "./store";
 import { clock, dayKey, minutesOf, weekday } from "./time";
 import { announce, dm, esc, todayText } from "./notify";
-import { apleo } from "./apleo";
+import { apleo, apleoReady, picks as apleoPicks } from "./apleo";
 import { buildDaily, buildWeekly, feed } from "./feed";
 
 /** True during the 90 minutes after `at` (so a restart or a late /tick doesn't skip it), once per key. */
@@ -36,6 +36,18 @@ export async function tick() {
   }
 
   const tz = env.defaultTz, date = dayKey(tz);
+
+  // New morning picks: a DM to each person the first time their picks for a new day show up.
+  if (apleoReady()) for (const m of await members.all()) {
+    const slug = profileOf(m);
+    if (!slug) continue;
+    const list = await apleoPicks.list(slug, true).catch(() => null);
+    const latest = list?.[0]?.day;
+    if (!latest || (await kv.get(`picks:told:${m.id}`)) === latest) continue;
+    const fresh = list!.filter(p => p.day === latest && p.status === "new");
+    await kv.set(`picks:told:${m.id}`, latest);
+    if (fresh.length) await dm(m.id, `🎯 ${fresh.length} new pick${fresh.length === 1 ? "" : "s"} for you today${fresh[0] ? `, starting with <b>${esc(fresh[0].title)}</b> at ${esc(fresh[0].company)}` : ""}. Send /picks or open the board.`);
+  }
 
   // Daily feed (and on Sundays, the weekly notes and project ideas), then a digest to the team.
   if (await due(clock(tz), env.feedAt, `sent:feed:${date}`)) {

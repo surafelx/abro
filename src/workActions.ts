@@ -18,7 +18,7 @@ const need = <T>(v: T | undefined | null, msg: string): T => { if (v == null) th
 
 async function ownWork(m: Member, id: number) {
   const w = need(await works.get(id), "That item is gone.");
-  if (w.member !== m.id) throw new UserError("That belongs to your partner.");
+  if (w.member !== m.id) throw new UserError("That belongs to a teammate.");
   return w;
 }
 
@@ -135,10 +135,10 @@ export async function runProfileCheck(m: Member) {
   await brand.set(m.id, { check });
 }
 
-/** Mark a draft as posted; the partner gets the link so they can boost it early. */
+/** Mark a draft as posted; the team gets the link so they can boost it early. */
 export async function markPosted(m: Member, id: number, url: string) {
   const d = need(await drafts.get(id), "That draft is gone.");
-  if (d.member !== m.id) throw new UserError("That draft belongs to your partner.");
+  if (d.member !== m.id) throw new UserError("That draft belongs to a teammate.");
   await drafts.markPosted(id, url);
   const n = (await drafts.postedSince(weekStart())).filter(p => p.member === m.id).length;
   const where = PLATFORMS[d.platform as Platform] ?? d.platform;
